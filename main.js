@@ -1108,6 +1108,13 @@ window.addEventListener('load', function() {
   sfPlayerTargetId = urlParams.get('player_profile_number');
   
   if (!sfPlayerTargetId) {
+    var personalDiv = document.getElementById('personal-player-number');
+    if (personalDiv) {
+      sfPlayerTargetId = (personalDiv.innerText || personalDiv.textContent || '').trim();
+    }
+  }
+  
+  if (!sfPlayerTargetId) {
     document.getElementById('sf-player-container').innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">No player specified.</p>';
     return;
   }

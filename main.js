@@ -1370,7 +1370,7 @@ window.loadFriendsLeaderboard = async function() {
     return '<tr style="' + rowStyle + '">'
       + '<td style="padding:12px 14px;color:#888;">' + (i + 1) + '</td>'
       + '<td style="padding:12px 14px;color:#111;">' + nameLabel + '</td>'
-      + '<td style="padding:12px 14px;"><span style="padding:2px 10px;background:#f5f5f5;border-radius:4px;font-size:12px;">' + (p.Tier || 'N/A') + '</span></td>'
++ '<td style="padding:12px 14px;"><span style="padding:2px 10px;background:#f5f5f5;color:#555;border-radius:4px;font-size:12px;">' + (p.Tier || 'N/A') + '</span></td>'
       + '<td style="padding:12px 14px;color:#111;font-weight:500;">' + (p.XP || 0) + '</td>'
       + '<td style="padding:12px 14px;color:#555;">' + (p['State/Province'] || 'N/A') + '</td>'
       + '<td style="padding:12px 14px;color:#555;">' + (p.Country || 'N/A') + '</td>'

@@ -1497,3 +1497,116 @@ window.renderGroupLeaderboard = function() {
       + '</a>';
   }).join('');
 };
+
+window.addEventListener('load', async function() {
+  if (!document.getElementById('group-player-leaderboard-container')) return;
+
+  if (window.$memberstackDom) {
+    try {
+      var memberData = await window.$memberstackDom.getCurrentMember();
+      if (memberData && memberData.data) {
+        currentPlayerEmail = memberData.data.auth.email;
+        var playerResult = await _supabase
+          .from('Players')
+          .select('"player_id", "Email"')
+          .eq('"Email"', currentPlayerEmail)
+          .limit(1);
+        if (playerResult.data && playerResult.data.length > 0) {
+          currentPlayerProfileNumber = playerResult.data[0].player_id;
+        }
+      }
+    } catch (e) {
+      console.error('Memberstack error:', e);
+    }
+  }
+
+  window.loadGroupPlayerLeaderboard();
+});
+
+window.loadGroupPlayerLeaderboard = async function() {
+  var container = document.getElementById('group-player-leaderboard-container');
+  if (!container) return;
+
+  var urlParams = new URLSearchParams(window.location.search);
+  var groupNumber = urlParams.get('group_number');
+
+  if (!groupNumber) {
+    container.innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">No group specified.</p>';
+    return;
+  }
+
+  var groupResult = await _supabase
+    .from('Groups')
+    .select('"id", "group_name"')
+    .eq('group_number', groupNumber)
+    .limit(1);
+
+  if (!groupResult.data || groupResult.data.length === 0) {
+    container.innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">Group not found.</p>';
+    return;
+  }
+
+  var groupId = groupResult.data[0].id;
+  var groupName = groupResult.data[0].group_name;
+
+  var membersResult = await _supabase
+    .from('Group Members')
+    .select('player_id')
+    .eq('group_id', groupId);
+
+  var memberIds = (membersResult.data || []).map(function(m) { return m.player_id; });
+
+  if (memberIds.length === 0) {
+    container.innerHTML = ''
+      + '<div style="padding:0 16px;">'
+      + '<h2 style="font-size:22px;font-weight:500;margin-bottom:1.25rem;color:#111;">' + groupName + ' Leaderboard</h2>'
+      + '<p style="color:#888;font-size:14px;">This group has no members yet.</p>'
+      + '</div>';
+    return;
+  }
+
+  var playersResult = await _supabase
+    .from('Players')
+    .select('"player_id", "Username", "Tier", "XP", "State/Province", "Country"')
+    .in('player_id', memberIds)
+    .order('"XP"', { ascending: false });
+
+  var players = playersResult.data || [];
+
+  var rows = players.map(function(p, i) {
+    var isMe = currentPlayerProfileNumber && p.player_id == currentPlayerProfileNumber;
+    var rowStyle = isMe
+      ? 'border-bottom:1px solid #f5f5f5;background:#e6f1fb;'
+      : 'border-bottom:1px solid #f5f5f5;';
+    var nameLabel = isMe
+      ? (p.Username || 'You') + ' <span style="font-size:11px;color:#378add;font-weight:500;margin-left:4px;">(You)</span>'
+      : (p.Username || 'N/A');
+
+    return '<tr style="' + rowStyle + '">'
+      + '<td style="padding:12px 14px;color:#888;">' + (i + 1) + '</td>'
+      + '<td style="padding:12px 14px;color:#111;">' + nameLabel + '</td>'
+      + '<td style="padding:12px 14px;"><span style="padding:2px 10px;background:#f5f5f5;color:#555;border-radius:4px;font-size:12px;">' + (p.Tier || 'N/A') + '</span></td>'
+      + '<td style="padding:12px 14px;color:#111;font-weight:500;">' + (p.XP || 0) + '</td>'
+      + '<td style="padding:12px 14px;color:#555;">' + (p['State/Province'] || 'N/A') + '</td>'
+      + '<td style="padding:12px 14px;color:#555;">' + (p.Country || 'N/A') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  container.innerHTML = ''
+    + '<div style="padding:0 16px;">'
+    + '<h2 style="font-size:22px;font-weight:500;margin-bottom:1.25rem;color:#111;">' + groupName + ' Leaderboard</h2>'
+    + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
+    + '<table style="min-width:600px;width:100%;border-collapse:collapse;font-size:13px;">'
+    + '<thead><tr style="border-bottom:1px solid #eee;">'
+    + '<th style="text-align:left;padding:10px 14px;color:#888;font-weight:500;"># Rank</th>'
+    + '<th style="text-align:left;padding:10px 14px;color:#888;font-weight:500;">Username</th>'
+    + '<th style="text-align:left;padding:10px 14px;color:#888;font-weight:500;">Tier</th>'
+    + '<th style="text-align:left;padding:10px 14px;color:#888;font-weight:500;">XP</th>'
+    + '<th style="text-align:left;padding:10px 14px;color:#888;font-weight:500;">State/Province</th>'
+    + '<th style="text-align:left;padding:10px 14px;color:#888;font-weight:500;">Country</th>'
+    + '</tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table>'
+    + '</div>'
+    + '</div>';
+};

@@ -1096,3 +1096,106 @@ window.renderLiveCourtFeed = function() {
   }).join('');
 };
 
+var sfPlayerPage = 0;
+var sfPlayerLoading = false;
+var sfPlayerDone = false;
+var sfPlayerTargetId = null;
+
+window.addEventListener('load', function() {
+  if (!document.getElementById('sf-player-container')) return;
+  
+  var urlParams = new URLSearchParams(window.location.search);
+  sfPlayerTargetId = urlParams.get('player_profile_number');
+  
+  if (!sfPlayerTargetId) {
+    document.getElementById('sf-player-container').innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">No player specified.</p>';
+    return;
+  }
+  
+  window.initSFPlayer();
+});
+
+window.initSFPlayer = function() {
+  var container = document.getElementById('sf-player-container');
+  if (!container) return;
+
+  container.innerHTML = ''
+    + '<div style="padding:0 16px;max-width:640px;margin:0 auto;">'
+    + '<h2 style="font-size:20px;font-weight:500;margin-bottom:1.25rem;color:#111;">Posts</h2>'
+    + '<div id="sf-player-posts" style="display:flex;flex-direction:column;gap:20px;"></div>'
+    + '<div id="sf-player-loader" style="text-align:center;padding:20px;color:#888;font-size:14px;">Loading...</div>'
+    + '<div id="sf-player-end" style="text-align:center;padding:20px;color:#888;font-size:14px;display:none;">No more posts</div>'
+    + '</div>';
+
+  window.loadMoreSFPlayer();
+
+  window.addEventListener('scroll', function() {
+    if (sfPlayerLoading || sfPlayerDone) return;
+    var scrollPos = window.innerHeight + window.scrollY;
+    var threshold = document.body.offsetHeight - 500;
+    if (scrollPos >= threshold) {
+      window.loadMoreSFPlayer();
+    }
+  });
+};
+
+window.loadMoreSFPlayer = async function() {
+  if (sfPlayerLoading || sfPlayerDone) return;
+  sfPlayerLoading = true;
+
+  var from = sfPlayerPage * POSTS_PER_LOAD;
+  var to = from + POSTS_PER_LOAD - 1;
+
+  var result = await _supabase
+    .from('Social Feed')
+    .select('"Feed Posts", "Post", "Attachments", "Players", "Court Name", "Date", "player_id"')
+    .eq('player_id', sfPlayerTargetId)
+    .order('"Date"', { ascending: false })
+    .range(from, to);
+
+  var data = result.data;
+  var error = result.error;
+
+  if (error) { console.error(error); sfPlayerLoading = false; return; }
+
+  if (!data || data.length === 0) {
+    sfPlayerDone = true;
+    var loader = document.getElementById('sf-player-loader');
+    var endMsg = document.getElementById('sf-player-end');
+    if (loader) loader.style.display = 'none';
+    if (endMsg) endMsg.style.display = sfPlayerPage === 0 ? 'block' : 'block';
+    if (sfPlayerPage === 0 && endMsg) endMsg.innerText = 'This player has no posts yet.';
+    sfPlayerLoading = false;
+    return;
+  }
+
+  var postsContainer = document.getElementById('sf-player-posts');
+  var newPosts = data.map(function(post) {
+    return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
+      + '<div style="position:relative;">'
+      + '<img src="' + (post.Attachments || '') + '" style="width:100%;max-height:500px;object-fit:cover;display:block;" />'
+      + '<span style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);color:#fff;font-size:13px;padding:5px 12px;border-radius:20px;font-weight:500;">' + (post.Players || '') + '</span>'
+      + '</div>'
+      + '<div style="padding:16px 18px;">'
+      + '<div style="display:flex;justify-content:space-between;margin-bottom:10px;">'
+      + '<span style="font-size:12px;color:#888;">' + (post.Date || 'N/A') + '</span>'
+      + '<span style="font-size:12px;color:#888;">' + (post['Court Name'] || 'N/A') + '</span>'
+      + '</div>'
+      + (post.Post ? '<p style="font-size:15px;color:#111;margin:0;line-height:1.5;">' + post.Post + '</p>' : '')
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  postsContainer.insertAdjacentHTML('beforeend', newPosts);
+
+  if (data.length < POSTS_PER_LOAD) {
+    sfPlayerDone = true;
+    var loader = document.getElementById('sf-player-loader');
+    var endMsg = document.getElementById('sf-player-end');
+    if (loader) loader.style.display = 'none';
+    if (endMsg) endMsg.style.display = 'block';
+  }
+
+  sfPlayerPage++;
+  sfPlayerLoading = false;
+};

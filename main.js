@@ -1170,8 +1170,10 @@ window.loadMoreSFPlayer = async function() {
     var loader = document.getElementById('sf-player-loader');
     var endMsg = document.getElementById('sf-player-end');
     if (loader) loader.style.display = 'none';
-    if (endMsg) endMsg.style.display = sfPlayerPage === 0 ? 'block' : 'block';
-    if (sfPlayerPage === 0 && endMsg) endMsg.innerText = 'This player has no posts yet.';
+    if (endMsg) {
+      endMsg.style.display = 'block';
+      if (sfPlayerPage === 0) endMsg.innerText = 'This player has no posts yet.';
+    }
     sfPlayerLoading = false;
     return;
   }

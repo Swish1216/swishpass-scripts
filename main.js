@@ -1717,3 +1717,119 @@ window.loadSFGroup = async function(groupNumber) {
     + viewAllBtn
     + '</div>';
 };
+
+window.addEventListener('load', function() {
+  if (document.getElementById('signup-container')) {
+    window.initSignup();
+  }
+});
+
+window.initSignup = function() {
+  var container = document.getElementById('signup-container');
+  if (!container) return;
+
+  container.innerHTML = ''
+    + '<div style="padding:0 16px;max-width:440px;margin:0 auto;">'
+    + '<h2 style="font-size:24px;font-weight:500;margin-bottom:8px;color:#111;">Create Your Account</h2>'
+    + '<p style="font-size:14px;color:#888;margin-bottom:1.5rem;">Join the community of verified hoopers.</p>'
+    + '<div id="signup-form">'
+    + '<label style="display:block;font-size:13px;color:#555;margin-bottom:6px;">Email</label>'
+    + '<input id="signup-email" type="email" placeholder="you@example.com" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:14px;color:#111;box-sizing:border-box;" />'
+    + '<label style="display:block;font-size:13px;color:#555;margin-bottom:6px;">Password</label>'
+    + '<input id="signup-password" type="password" placeholder="At least 8 characters" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:14px;color:#111;box-sizing:border-box;" />'
+    + '<label style="display:block;font-size:13px;color:#555;margin-bottom:6px;">Country</label>'
+    + '<select id="signup-country" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:14px;color:#111;background:#fff;box-sizing:border-box;">'
+    + '<option value="">Select a country</option>'
+    + '<option value="United States">United States</option>'
+    + '<option value="Canada">Canada</option>'
+    + '<option value="Brazil">Brazil</option>'
+    + '<option value="Other">Other</option>'
+    + '</select>'
+    + '<label style="display:block;font-size:13px;color:#555;margin-bottom:6px;">State/Province (optional)</label>'
+    + '<input id="signup-state" type="text" placeholder="e.g. Illinois" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:14px;color:#111;box-sizing:border-box;" />'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#555;margin-bottom:20px;cursor:pointer;">'
+    + '<input id="signup-terms" type="checkbox" style="width:16px;height:16px;" />'
+    + '<span>I agree to the <a href="/terms" target="_blank" style="color:#378add;">Terms of Service</a></span>'
+    + '</label>'
+    + '<button id="signup-submit" onclick="submitSignup()" style="width:100%;padding:12px 20px;background:#378add;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;">Create Account</button>'
+    + '<div id="signup-message" style="font-size:13px;margin-top:12px;min-height:20px;"></div>'
+    + '<p style="font-size:13px;color:#555;text-align:center;margin-top:16px;">Already have an account? <a href="/sign-in" style="color:#378add;">Log in</a></p>'
+    + '</div>'
+    + '</div>';
+};
+
+window.submitSignup = async function() {
+  var email = document.getElementById('signup-email').value.trim();
+  var password = document.getElementById('signup-password').value;
+  var country = document.getElementById('signup-country').value;
+  var state = document.getElementById('signup-state').value.trim();
+  var termsAgreed = document.getElementById('signup-terms').checked;
+  var messageEl = document.getElementById('signup-message');
+  var btn = document.getElementById('signup-submit');
+
+  messageEl.innerHTML = '';
+
+  if (!email || !password) {
+    messageEl.innerHTML = '<span style="color:#e24b4a;">Email and password are required.</span>';
+    return;
+  }
+
+  if (password.length < 8) {
+    messageEl.innerHTML = '<span style="color:#e24b4a;">Password must be at least 8 characters.</span>';
+    return;
+  }
+
+  if (!country) {
+    messageEl.innerHTML = '<span style="color:#e24b4a;">Please select a country.</span>';
+    return;
+  }
+
+  if (!termsAgreed) {
+    messageEl.innerHTML = '<span style="color:#e24b4a;">You must agree to the Terms of Service.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerText = 'Creating account...';
+
+  var signUpResult = await _supabase.auth.signUp({
+    email: email,
+    password: password
+  });
+
+  if (signUpResult.error) {
+    console.error(signUpResult.error);
+    messageEl.innerHTML = '<span style="color:#e24b4a;">' + signUpResult.error.message + '</span>';
+    btn.disabled = false;
+    btn.innerText = 'Create Account';
+    return;
+  }
+
+  var authUserId = signUpResult.data.user.id;
+
+  var playerInsert = await _supabase
+    .from('Players')
+    .insert({
+      auth_user_id: authUserId,
+      Email: email,
+      Country: country,
+      'State/Province': state || null,
+      XP: 0,
+      Tier: 'Rookie'
+    })
+    .select();
+
+  if (playerInsert.error) {
+    console.error(playerInsert.error);
+    messageEl.innerHTML = '<span style="color:#e24b4a;">Account created but profile setup failed. Contact support.</span>';
+    btn.disabled = false;
+    btn.innerText = 'Create Account';
+    return;
+  }
+
+  messageEl.innerHTML = '<span style="color:#2d7a3a;">Account created! Redirecting to username setup...</span>';
+
+  setTimeout(function() {
+    window.location.href = '/username-setup';
+  }, 1500);
+};

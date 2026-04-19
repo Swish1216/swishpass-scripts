@@ -1728,6 +1728,13 @@ window.initSignup = function() {
   var container = document.getElementById('signup-container');
   if (!container) return;
 
+  var countries = ["United States","Canada","Afghanistan","Albania","Algeria","Andorra","Angola","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bhutan","Bolivia","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Djibouti","Dominica","Dominican Republic","Ecuador","Egypt","El Salvador","Estonia","Ethiopia","Fiji","Finland","France","Gabon","Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guyana","Haiti","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Panama","Papua New Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Rwanda","Saint Kitts and Nevis","Saint Lucia","Samoa","San Marino","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Togo","Tonga","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","Uruguay","Uzbekistan","Vanuatu","Vatican City","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe"];
+
+  var states = ["N/A","Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","District of Columbia","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming","Alberta","British Columbia","Manitoba","New Brunswick","Newfoundland and Labrador","Northwest Territories","Nova Scotia","Nunavut","Ontario","Prince Edward Island","Quebec","Saskatchewan","Yukon"];
+
+  var countryOptions = countries.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('');
+  var stateOptions = states.map(function(s) { return '<option value="' + s + '">' + s + '</option>'; }).join('');
+
   container.innerHTML = ''
     + '<div style="padding:0 16px;max-width:440px;margin:0 auto;">'
     + '<h2 style="font-size:24px;font-weight:500;margin-bottom:8px;color:#111;">Create Your Account</h2>'
@@ -1739,17 +1746,17 @@ window.initSignup = function() {
     + '<input id="signup-password" type="password" placeholder="At least 8 characters" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:14px;color:#111;box-sizing:border-box;" />'
     + '<label style="display:block;font-size:13px;color:#555;margin-bottom:6px;">Country</label>'
     + '<select id="signup-country" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:14px;color:#111;background:#fff;box-sizing:border-box;">'
-    + '<option value="">Select a country</option>'
-    + '<option value="United States">United States</option>'
-    + '<option value="Canada">Canada</option>'
-    + '<option value="Brazil">Brazil</option>'
-    + '<option value="Other">Other</option>'
+    + '<option value="">Select your country</option>'
+    + countryOptions
     + '</select>'
     + '<label style="display:block;font-size:13px;color:#555;margin-bottom:6px;">State/Province (optional)</label>'
-    + '<input id="signup-state" type="text" placeholder="e.g. Illinois" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:14px;color:#111;box-sizing:border-box;" />'
+    + '<select id="signup-state" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:14px;color:#111;background:#fff;box-sizing:border-box;">'
+    + '<option value="">Select your state or province</option>'
+    + stateOptions
+    + '</select>'
     + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#555;margin-bottom:20px;cursor:pointer;">'
     + '<input id="signup-terms" type="checkbox" style="width:16px;height:16px;" />'
-    + '<span>I agree to the <a href="/terms" target="_blank" style="color:#378add;">Terms of Service</a></span>'
+    + '<span>I agree to the <a href="/terms-and-conditions" target="_blank" style="color:#378add;">Terms and Conditions</a></span>'
     + '</label>'
     + '<button id="signup-submit" onclick="submitSignup()" style="width:100%;padding:12px 20px;background:#378add;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;">Create Account</button>'
     + '<div id="signup-message" style="font-size:13px;margin-top:12px;min-height:20px;"></div>'
@@ -1762,7 +1769,7 @@ window.submitSignup = async function() {
   var email = document.getElementById('signup-email').value.trim();
   var password = document.getElementById('signup-password').value;
   var country = document.getElementById('signup-country').value;
-  var state = document.getElementById('signup-state').value.trim();
+  var state = document.getElementById('signup-state').value;
   var termsAgreed = document.getElementById('signup-terms').checked;
   var messageEl = document.getElementById('signup-message');
   var btn = document.getElementById('signup-submit');
@@ -1785,7 +1792,7 @@ window.submitSignup = async function() {
   }
 
   if (!termsAgreed) {
-    messageEl.innerHTML = '<span style="color:#e24b4a;">You must agree to the Terms of Service.</span>';
+    messageEl.innerHTML = '<span style="color:#e24b4a;">You must agree to the Terms and Conditions.</span>';
     return;
   }
 

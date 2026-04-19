@@ -1395,3 +1395,105 @@ window.loadFriendsLeaderboard = async function() {
     + '</div>'
     + '</div>';
 };
+
+window.addEventListener('load', function() {
+  if (document.getElementById('group-leaderboard-container')) {
+    window.initGroupLeaderboard();
+  }
+});
+
+window.initGroupLeaderboard = function() {
+  var container = document.getElementById('group-leaderboard-container');
+  if (!container) return;
+
+  container.innerHTML = ''
+    + '<div style="padding:0 16px;max-width:800px;margin:0 auto;">'
+    + '<h2 style="font-size:22px;font-weight:500;margin-bottom:8px;color:#111;">Groups</h2>'
+    + '<p style="font-size:13px;color:#888;margin-bottom:1rem;">Browse all groups and click one to see details.</p>'
+    + '<input id="gl-search" type="text" placeholder="Search groups..." oninput="renderGroupLeaderboard()" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:1rem;color:#111;box-sizing:border-box;" />'
+    + '<div id="gl-list" style="display:flex;flex-direction:column;gap:10px;"><p style="padding:2rem;text-align:center;color:#888;">Loading...</p></div>'
+    + '</div>';
+
+  window.loadGroupLeaderboardData();
+};
+
+window.groupLeaderboardData = [];
+
+window.loadGroupLeaderboardData = async function() {
+  var groupsResult = await _supabase
+    .from('Groups')
+    .select('"id", "group_number", "group_name", "description", "created_by", "group_page_url"')
+    .order('"group_number"', { ascending: true });
+
+  var groups = groupsResult.data || [];
+
+  if (groups.length === 0) {
+    document.getElementById('gl-list').innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">No groups exist yet.</p>';
+    return;
+  }
+
+  var membersResult = await _supabase
+    .from('Group Members')
+    .select('group_id');
+
+  var memberCounts = {};
+  (membersResult.data || []).forEach(function(m) {
+    memberCounts[m.group_id] = (memberCounts[m.group_id] || 0) + 1;
+  });
+
+  var creatorIds = [...new Set(groups.map(function(g) { return g.created_by; }).filter(Boolean))];
+  var creatorMap = {};
+  if (creatorIds.length > 0) {
+    var creatorsResult = await _supabase
+      .from('Players')
+      .select('"player_id", "Username"')
+      .in('player_id', creatorIds);
+    (creatorsResult.data || []).forEach(function(p) { creatorMap[p.player_id] = p.Username; });
+  }
+
+  window.groupLeaderboardData = groups.map(function(g) {
+    return {
+      id: g.id,
+      groupNumber: g.group_number,
+      groupName: g.group_name,
+      description: g.description,
+      creatorName: creatorMap[g.created_by] || 'Unknown',
+      memberCount: memberCounts[g.id] || 0,
+      profileUrl: '/group-profiles?group_number=' + g.group_number
+    };
+  });
+
+  window.renderGroupLeaderboard();
+};
+
+window.renderGroupLeaderboard = function() {
+  var list = document.getElementById('gl-list');
+  if (!list) return;
+
+  var searchInput = document.getElementById('gl-search');
+  var search = searchInput ? searchInput.value.toLowerCase() : '';
+
+  var filtered = window.groupLeaderboardData;
+  if (search) {
+    filtered = filtered.filter(function(g) {
+      return (g.groupName || '').toLowerCase().includes(search)
+        || (g.creatorName || '').toLowerCase().includes(search);
+    });
+  }
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">No groups found.</p>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(function(g) {
+    return '<a href="' + g.profileUrl + '" style="display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid #eee;border-radius:10px;background:#fff;text-decoration:none;color:#111;">'
+      + '<div style="width:48px;height:48px;border-radius:10px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#555;font-size:15px;font-weight:500;flex-shrink:0;">' + (g.groupName ? g.groupName.charAt(0).toUpperCase() : '?') + '</div>'
+      + '<div style="flex:1;min-width:0;">'
+      + '<p style="font-size:15px;font-weight:500;color:#111;margin:0 0 2px;">' + (g.groupName || 'Unnamed Group') + '</p>'
+      + '<p style="font-size:12px;color:#888;margin:0;">' + g.memberCount + ' member' + (g.memberCount === 1 ? '' : 's') + ' · Created by ' + g.creatorName + '</p>'
+      + '</div>'
+      + '<span style="color:#888;font-size:18px;">›</span>'
+      + '</a>';
+  }).join('');
+};

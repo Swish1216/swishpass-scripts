@@ -1208,3 +1208,93 @@ window.loadMoreSFPlayer = async function() {
   sfPlayerPage++;
   sfPlayerLoading = false;
 };
+
+var badgesEarnedPlayerTargetId = null;
+
+window.addEventListener('load', function() {
+  if (!document.getElementById('badges-earned-player-container')) return;
+  
+  var urlParams = new URLSearchParams(window.location.search);
+  badgesEarnedPlayerTargetId = urlParams.get('player_profile_number');
+  
+  if (!badgesEarnedPlayerTargetId) {
+    var personalDiv = document.getElementById('personal-player-number');
+    if (personalDiv) {
+      badgesEarnedPlayerTargetId = (personalDiv.innerText || personalDiv.textContent || '').trim();
+    }
+  }
+  
+  if (!badgesEarnedPlayerTargetId) {
+    document.getElementById('badges-earned-player-container').innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">No player specified.</p>';
+    return;
+  }
+  
+  window.loadBadgesEarnedPlayer();
+});
+
+window.loadBadgesEarnedPlayer = async function() {
+  var container = document.getElementById('badges-earned-player-container');
+  if (!container) return;
+
+  var allBadgesResult = await _supabase
+    .from('Badges')
+    .select('"Name", "Notes", "URL", "Badge Image URL", "Season", "Start Date", "End Date", "Badge #"')
+    .order('"Badge #"', { ascending: true });
+
+  var allBadges = allBadgesResult.data || [];
+
+  var earnedResult = await _supabase
+    .from('Player Badges')
+    .select('"Badge", "Date"')
+    .eq('player_id', badgesEarnedPlayerTargetId);
+
+  var earnedBadges = earnedResult.data || [];
+  var earnedMap = {};
+  earnedBadges.forEach(function(eb) {
+    earnedMap[eb.Badge] = eb.Date;
+  });
+
+  var earnedCount = earnedBadges.length;
+  var totalCount = allBadges.length;
+
+  var items = allBadges.map(function(b) {
+    var isEarned = earnedMap.hasOwnProperty(b.Name);
+    var earnedDate = earnedMap[b.Name];
+
+    var imageStyle = isEarned
+      ? 'width:64px;height:64px;object-fit:contain;border-radius:8px;background:#f5f5f5;'
+      : 'width:64px;height:64px;object-fit:contain;border-radius:8px;background:#f5f5f5;filter:grayscale(100%);opacity:0.4;';
+
+    var statusBadge = isEarned
+      ? '<span style="padding:3px 10px;background:#e6f4ea;color:#2d7a3a;border-radius:12px;font-size:11px;font-weight:500;">✓ Earned</span>'
+      : '<span style="padding:3px 10px;background:#f5f5f5;color:#888;border-radius:12px;font-size:11px;">Locked</span>';
+
+    var nameColor = isEarned ? '#111' : '#888';
+    var dateText = isEarned
+      ? '<p style="font-size:12px;color:#2d7a3a;margin:0;">Earned ' + (earnedDate ? new Date(earnedDate).toLocaleDateString() : '') + '</p>'
+      : '<p style="font-size:12px;color:#888;margin:0;">Not yet earned</p>';
+
+    return '<div style="display:flex;align-items:flex-start;gap:16px;padding:16px;border-bottom:1px solid #f0f0f0;">'
+      + '<img src="' + (b['Badge Image URL'] || '') + '" alt="' + b.Name + '" style="' + imageStyle + 'flex-shrink:0;" />'
+      + '<div style="flex:1;">'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">'
+      + '<p style="font-size:15px;font-weight:500;color:' + nameColor + ';margin:0;">' + b.Name + '</p>'
+      + statusBadge
+      + '</div>'
+      + '<p style="font-size:13px;color:#555;margin:0 0 6px;">' + (b.Notes || '') + '</p>'
+      + dateText
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  container.innerHTML = ''
+    + '<div style="padding:0 16px;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">'
+    + '<h2 style="font-size:22px;font-weight:500;color:#111;margin:0;">Badges</h2>'
+    + '<span style="font-size:14px;color:#888;">' + earnedCount + ' / ' + totalCount + ' earned</span>'
+    + '</div>'
+    + '<div style="background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">'
+    + (items || '<p style="padding:2rem;text-align:center;color:#888;">No badges available</p>')
+    + '</div>'
+    + '</div>';
+};

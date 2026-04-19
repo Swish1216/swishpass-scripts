@@ -1,14 +1,3 @@
-<!-- Memberstack webflow package -->
-<script data-memberstack-app="app_cmad5grfc00o30wr0apnxea9a" src="https://static.memberstack.com/scripts/v1/memberstack.js" type="text/javascript">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-
-  window._supabase = window.supabase.createClient(
-    'https://wscsrjaylotmcabdwvde.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzY3NyamF5bG90bWNhYmR3dmRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NjIzMjksImV4cCI6MjA5MTQzODMyOX0.vxOOFeWO0iRqjOWAHbLy_dvPE7hWkBOCC3JlWhDN0RY'
-  )
-
-
-
 window.addEventListener('load', function() {
   if (document.getElementById('leaderboard-container')) {
     window.loadLeaderboard();

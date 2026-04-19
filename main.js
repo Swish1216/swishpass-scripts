@@ -1610,3 +1610,136 @@ window.loadGroupPlayerLeaderboard = async function() {
     + '</div>'
     + '</div>';
 };
+
+var sfGroupPage = 0;
+var sfGroupLoading = false;
+var sfGroupDone = false;
+var sfGroupMemberIds = [];
+
+window.addEventListener('load', async function() {
+  if (!document.getElementById('sf-group-container')) return;
+
+  var urlParams = new URLSearchParams(window.location.search);
+  var groupNumber = urlParams.get('group_number');
+
+  if (!groupNumber) {
+    document.getElementById('sf-group-container').innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">No group specified.</p>';
+    return;
+  }
+
+  var groupResult = await _supabase
+    .from('Groups')
+    .select('"id"')
+    .eq('group_number', groupNumber)
+    .limit(1);
+
+  if (!groupResult.data || groupResult.data.length === 0) {
+    document.getElementById('sf-group-container').innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">Group not found.</p>';
+    return;
+  }
+
+  var groupId = groupResult.data[0].id;
+
+  var membersResult = await _supabase
+    .from('Group Members')
+    .select('player_id')
+    .eq('group_id', groupId);
+
+  sfGroupMemberIds = (membersResult.data || []).map(function(m) { return m.player_id; });
+
+  window.initSFGroup();
+});
+
+window.initSFGroup = function() {
+  var container = document.getElementById('sf-group-container');
+  if (!container) return;
+
+  container.innerHTML = ''
+    + '<div style="padding:0 16px;max-width:640px;margin:0 auto;">'
+    + '<h2 style="font-size:20px;font-weight:500;margin-bottom:1.25rem;color:#111;">Group Feed</h2>'
+    + '<div id="sf-group-posts" style="display:flex;flex-direction:column;gap:20px;"></div>'
+    + '<div id="sf-group-loader" style="text-align:center;padding:20px;color:#888;font-size:14px;">Loading...</div>'
+    + '<div id="sf-group-end" style="text-align:center;padding:20px;color:#888;font-size:14px;display:none;">No more posts</div>'
+    + '</div>';
+
+  if (sfGroupMemberIds.length === 0) {
+    document.getElementById('sf-group-loader').style.display = 'none';
+    document.getElementById('sf-group-end').innerText = 'This group has no members yet.';
+    document.getElementById('sf-group-end').style.display = 'block';
+    return;
+  }
+
+  window.loadMoreSFGroup();
+
+  window.addEventListener('scroll', function() {
+    if (sfGroupLoading || sfGroupDone) return;
+    var scrollPos = window.innerHeight + window.scrollY;
+    var threshold = document.body.offsetHeight - 500;
+    if (scrollPos >= threshold) {
+      window.loadMoreSFGroup();
+    }
+  });
+};
+
+window.loadMoreSFGroup = async function() {
+  if (sfGroupLoading || sfGroupDone) return;
+  sfGroupLoading = true;
+
+  var from = sfGroupPage * POSTS_PER_LOAD;
+  var to = from + POSTS_PER_LOAD - 1;
+
+  var result = await _supabase
+    .from('Social Feed')
+    .select('"Feed Posts", "Post", "Attachments", "Players", "Court Name", "Date", "player_id"')
+    .in('player_id', sfGroupMemberIds)
+    .order('"Date"', { ascending: false })
+    .range(from, to);
+
+  var data = result.data;
+  var error = result.error;
+
+  if (error) { console.error(error); sfGroupLoading = false; return; }
+
+  if (!data || data.length === 0) {
+    sfGroupDone = true;
+    var loader = document.getElementById('sf-group-loader');
+    var endMsg = document.getElementById('sf-group-end');
+    if (loader) loader.style.display = 'none';
+    if (endMsg) {
+      endMsg.style.display = 'block';
+      if (sfGroupPage === 0) endMsg.innerText = 'This group has no posts yet.';
+    }
+    sfGroupLoading = false;
+    return;
+  }
+
+  var postsContainer = document.getElementById('sf-group-posts');
+  var newPosts = data.map(function(post) {
+    return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
+      + '<div style="position:relative;">'
+      + '<img src="' + (post.Attachments || '') + '" style="width:100%;max-height:500px;object-fit:cover;display:block;" />'
+      + '<span style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);color:#fff;font-size:13px;padding:5px 12px;border-radius:20px;font-weight:500;">' + (post.Players || '') + '</span>'
+      + '</div>'
+      + '<div style="padding:16px 18px;">'
+      + '<div style="display:flex;justify-content:space-between;margin-bottom:10px;">'
+      + '<span style="font-size:12px;color:#888;">' + (post.Date || 'N/A') + '</span>'
+      + '<span style="font-size:12px;color:#888;">' + (post['Court Name'] || 'N/A') + '</span>'
+      + '</div>'
+      + (post.Post ? '<p style="font-size:15px;color:#111;margin:0;line-height:1.5;">' + post.Post + '</p>' : '')
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  postsContainer.insertAdjacentHTML('beforeend', newPosts);
+
+  if (data.length < POSTS_PER_LOAD) {
+    sfGroupDone = true;
+    var loader = document.getElementById('sf-group-loader');
+    var endMsg = document.getElementById('sf-group-end');
+    if (loader) loader.style.display = 'none';
+    if (endMsg) endMsg.style.display = 'block';
+  }
+
+  sfGroupPage++;
+  sfGroupLoading = false;
+};

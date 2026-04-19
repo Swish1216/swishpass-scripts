@@ -1298,3 +1298,100 @@ window.loadBadgesEarnedPlayer = async function() {
     + '</div>'
     + '</div>';
 };
+
+window.addEventListener('load', async function() {
+  if (!document.getElementById('friends-leaderboard-container')) return;
+
+  if (window.$memberstackDom) {
+    try {
+      var memberData = await window.$memberstackDom.getCurrentMember();
+      if (memberData && memberData.data) {
+        currentPlayerEmail = memberData.data.auth.email;
+        var playerResult = await _supabase
+          .from('Players')
+          .select('"player_id", "Email"')
+          .eq('"Email"', currentPlayerEmail)
+          .limit(1);
+        if (playerResult.data && playerResult.data.length > 0) {
+          currentPlayerProfileNumber = playerResult.data[0].player_id;
+        }
+      }
+    } catch (e) {
+      console.error('Memberstack error:', e);
+    }
+  }
+
+  window.loadFriendsLeaderboard();
+});
+
+window.loadFriendsLeaderboard = async function() {
+  var container = document.getElementById('friends-leaderboard-container');
+  if (!container) return;
+
+  if (!currentPlayerProfileNumber) {
+    container.innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">You must be logged in to view your friends leaderboard.</p>';
+    return;
+  }
+
+  var friendshipsResult = await _supabase
+    .from('Friendships')
+    .select('*')
+    .or('player_1_id.eq.' + currentPlayerProfileNumber + ',player_2_id.eq.' + currentPlayerProfileNumber);
+
+  var friendships = friendshipsResult.data || [];
+  var friendIds = friendships.map(function(f) {
+    return f.player_1_id == currentPlayerProfileNumber ? f.player_2_id : f.player_1_id;
+  });
+
+  var playerIds = friendIds.concat([currentPlayerProfileNumber]);
+
+  var playersResult = await _supabase
+    .from('Players')
+    .select('"player_id", "Username", "Tier", "XP", "State/Province", "Country"')
+    .in('player_id', playerIds)
+    .order('"XP"', { ascending: false });
+
+  var players = playersResult.data || [];
+
+  if (players.length === 0) {
+    container.innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">No friends yet. Add friends to see them here.</p>';
+    return;
+  }
+
+  var rows = players.map(function(p, i) {
+    var isMe = p.player_id == currentPlayerProfileNumber;
+    var rowStyle = isMe
+      ? 'border-bottom:1px solid #f5f5f5;background:#e6f1fb;'
+      : 'border-bottom:1px solid #f5f5f5;';
+    var nameLabel = isMe
+      ? (p.Username || 'You') + ' <span style="font-size:11px;color:#378add;font-weight:500;margin-left:4px;">(You)</span>'
+      : (p.Username || 'N/A');
+
+    return '<tr style="' + rowStyle + '">'
+      + '<td style="padding:12px 14px;color:#888;">' + (i + 1) + '</td>'
+      + '<td style="padding:12px 14px;color:#111;">' + nameLabel + '</td>'
+      + '<td style="padding:12px 14px;"><span style="padding:2px 10px;background:#f5f5f5;border-radius:4px;font-size:12px;">' + (p.Tier || 'N/A') + '</span></td>'
+      + '<td style="padding:12px 14px;color:#111;font-weight:500;">' + (p.XP || 0) + '</td>'
+      + '<td style="padding:12px 14px;color:#555;">' + (p['State/Province'] || 'N/A') + '</td>'
+      + '<td style="padding:12px 14px;color:#555;">' + (p.Country || 'N/A') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  container.innerHTML = ''
+    + '<div style="padding:0 16px;">'
+    + '<h2 style="font-size:22px;font-weight:500;margin-bottom:1.25rem;color:#111;">Friends Leaderboard</h2>'
+    + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
+    + '<table style="min-width:600px;width:100%;border-collapse:collapse;font-size:13px;">'
+    + '<thead><tr style="border-bottom:1px solid #eee;">'
+    + '<th style="text-align:left;padding:10px 14px;color:#888;font-weight:500;"># Rank</th>'
+    + '<th style="text-align:left;padding:10px 14px;color:#888;font-weight:500;">Username</th>'
+    + '<th style="text-align:left;padding:10px 14px;color:#888;font-weight:500;">Tier</th>'
+    + '<th style="text-align:left;padding:10px 14px;color:#888;font-weight:500;">XP</th>'
+    + '<th style="text-align:left;padding:10px 14px;color:#888;font-weight:500;">State/Province</th>'
+    + '<th style="text-align:left;padding:10px 14px;color:#888;font-weight:500;">Country</th>'
+    + '</tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table>'
+    + '</div>'
+    + '</div>';
+};

@@ -8,8 +8,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   const isPublic = PUBLIC_PATHS.some(p => path.includes(p));
 
   if (!isPublic) {
-    const { data: { user } } = await window._supabase.auth.getUser();
-    if (!user) {
+    const { data: { session } } = await window._supabase.auth.getSession();
+    if (!session) {
       window.location.href = "/sign-in";
       return;
     }

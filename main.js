@@ -1,3 +1,21 @@
+// ========================================
+// GLOBAL AUTH GUARD — runs on every page
+// ========================================
+const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/username-setup", "/profile-setup"];
+
+document.addEventListener("DOMContentLoaded", async function () {
+  const path = window.location.pathname;
+  const isPublic = PUBLIC_PATHS.some(p => path.includes(p));
+
+  if (!isPublic) {
+    const { data: { user } } = await window._supabase.auth.getUser();
+    if (!user) {
+      window.location.href = "/sign-in";
+      return;
+    }
+  }
+});
+
 window.addEventListener('load', function() {
   if (document.getElementById('leaderboard-container')) {
     window.loadLeaderboard();

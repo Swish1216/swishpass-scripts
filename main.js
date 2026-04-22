@@ -1850,7 +1850,7 @@ const AUTH_LINK_COLUMN = "auth_user_id";
 async function requireAuth() {
   const { data: { user } } = await window._supabase.auth.getUser();
   if (!user) {
-    window.location.href = "/log-in";
+    window.location.href = "/sign-in";
     return null;
   }
   return user;
@@ -1861,7 +1861,7 @@ async function requireAuth() {
 // ========================================
 document.addEventListener("DOMContentLoaded", function () {
   const path = window.location.pathname;
-  if (path.includes("/log-in")) initLogin();
+if (path.includes("/sign-in")) initLogin();
   else if (path.includes("/username-setup")) initUsernameSetup();
   else if (path.includes("/change-username")) initChangeUsername();
   else if (path.includes("/profile-setup")) initProfileSetup();

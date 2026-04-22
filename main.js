@@ -2264,3 +2264,53 @@ function injectPopStyles() {
   `;
   document.head.appendChild(style);
 }
+
+// ========================================
+// /log-in
+// ========================================
+async function initLogin() {
+  const container = document.getElementById("login-container");
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="pop-form">
+      <h2 class="pop-title">Welcome back</h2>
+      <input type="email" id="login-email" class="pop-input" placeholder="Email" />
+      <input type="password" id="login-password" class="pop-input" style="margin-top:12px;" placeholder="Password" />
+      <div id="login-feedback" class="pop-feedback"></div>
+      <button id="login-btn" class="pop-btn">Log In</button>
+    </div>
+  `;
+  injectPopStyles();
+
+  const emailInput = document.getElementById("login-email");
+  const passwordInput = document.getElementById("login-password");
+  const feedback = document.getElementById("login-feedback");
+  const loginBtn = document.getElementById("login-btn");
+
+  loginBtn.addEventListener("click", async function () {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      feedback.textContent = "Please enter your email and password.";
+      feedback.style.color = "#c00";
+      return;
+    }
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = "Logging in...";
+
+    const { error } = await window._supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      feedback.textContent = "Invalid email or password.";
+      feedback.style.color = "#c00";
+      loginBtn.disabled = false;
+      loginBtn.textContent = "Log In";
+      return;
+    }
+
+    window.location.href = "/sp-home";
+  });
+}

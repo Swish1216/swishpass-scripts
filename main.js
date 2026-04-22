@@ -9,13 +9,91 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   if (!isPublic) {
     const { data: { session } } = await window._supabase.auth.getSession();
+
     if (!session) {
       window.location.href = "/sign-in";
       return;
     }
+
+    // Redirect incomplete onboarding
+    const { data: player } = await window._supabase
+      .from("Players")
+      .select("Username, Position")
+      .eq("auth_user_id", session.user.id)
+      .single();
+
+    if (!player || !player.Username) {
+      window.location.href = "/username-setup";
+      return;
+    }
+
+    if (!player.Position) {
+      window.location.href = "/profile-setup";
+      return;
+    }
   }
+
+  // Page routing
+  if (path.includes("/sign-in")) initLogin();
+  else if (path.includes("/username-setup")) initUsernameSetup();
+  else if (path.includes("/change-username")) initChangeUsername();
+  else if (path.includes("/profile-setup")) initProfileSetup();
+
+  // Always run autofill on every page
+  autofillUser();
 });
 
+// ========================================
+// SHARED SUPABASE AUTH HELPER
+// Replaces all window.$memberstackDom blocks
+// ========================================
+async function getCurrentPlayer() {
+  const { data: { session } } = await window._supabase.auth.getSession();
+  if (!session) return { email: null, playerId: null };
+
+  const { data } = await window._supabase
+    .from("Players")
+    .select('player_id, "Email"')
+    .eq("auth_user_id", session.user.id)
+    .limit(1);
+
+  if (data && data.length > 0) {
+    return { email: data[0].Email, playerId: data[0].player_id };
+  }
+  return { email: session.user.email, playerId: null };
+}
+
+// ========================================
+// GLOBAL AUTOFILL
+// Populates any element with data-user="username" or data-user="email"
+// ========================================
+async function autofillUser() {
+  if (!window._supabase) return;
+
+  const { data: { session } } = await window._supabase.auth.getSession();
+  if (!session) return;
+
+  const { data: player } = await window._supabase
+    .from("Players")
+    .select('"Username", "Email"')
+    .eq("auth_user_id", session.user.id)
+    .single();
+
+  if (!player) return;
+
+  document.querySelectorAll("[data-user='username']").forEach(el => {
+    el.textContent = player.Username || "";
+  });
+  document.querySelectorAll("[data-user='email']").forEach(el => {
+    el.textContent = player.Email || "";
+  });
+}
+
+
+
+// ========================================
+// GLOBAL LEADERBOARD
+// ========================================
 window.addEventListener('load', function() {
   if (document.getElementById('leaderboard-container')) {
     window.loadLeaderboard();
@@ -28,7 +106,7 @@ window.loadLeaderboard = async function() {
   var search = document.getElementById('lb-search') ? document.getElementById('lb-search').value.toLowerCase() : '';
   var country = document.getElementById('lb-country') ? document.getElementById('lb-country').value : '';
   var state = document.getElementById('lb-state') ? document.getElementById('lb-state').value : '';
-  var result = await _supabase
+  var result = await window._supabase
     .from('Players')
     .select('"Username", "Tier", "XP", "State/Province", "Country"')
     .order('"XP"', { ascending: false });
@@ -37,7 +115,7 @@ window.loadLeaderboard = async function() {
   if (error) { console.error(error); return; }
   if (search) {
     data = data.filter(function(p) {
-      return p.Username.toLowerCase().includes(search);
+      return p.Username && p.Username.toLowerCase().includes(search);
     });
   }
   if (country) {
@@ -46,7 +124,7 @@ window.loadLeaderboard = async function() {
   if (state) {
     data = data.filter(function(p) { return p['State/Province'] === state; });
   }
-  var allResult = await _supabase
+  var allResult = await window._supabase
     .from('Players')
     .select('"Country", "State/Province"');
   var allData = allResult.data || [];
@@ -55,9 +133,9 @@ window.loadLeaderboard = async function() {
   var rows = data.map(function(p, i) {
     return '<tr style="border-bottom:1px solid #f5f5f5;">'
       + '<td style="padding:12px 14px;color:#888;">' + (i + 1) + '</td>'
-      + '<td style="padding:12px 14px;">' + p.Username + '</td>'
-      + '<td style="padding:12px 14px;"><span style="padding:2px 10px;background:#f5f5f5;border-radius:4px;font-size:12px;">' + p.Tier + '</span></td>'
-      + '<td style="padding:12px 14px;">' + p.XP + '</td>'
+      + '<td style="padding:12px 14px;">' + (p.Username || 'N/A') + '</td>'
+      + '<td style="padding:12px 14px;"><span style="padding:2px 10px;background:#f5f5f5;border-radius:4px;font-size:12px;">' + (p.Tier || 'N/A') + '</span></td>'
+      + '<td style="padding:12px 14px;">' + (p.XP || 0) + '</td>'
       + '<td style="padding:12px 14px;">' + (p['State/Province'] || 'N/A') + '</td>'
       + '<td style="padding:12px 14px;">' + (p.Country || 'N/A') + '</td>'
       + '</tr>';
@@ -91,6 +169,9 @@ window.loadLeaderboard = async function() {
 
 
 
+// ========================================
+// BADGES DASHBOARD
+// ========================================
 window.addEventListener('load', function() {
   if (document.getElementById('badges-container')) {
     window.loadBadges();
@@ -100,7 +181,7 @@ window.addEventListener('load', function() {
 window.loadBadges = async function() {
   var container = document.getElementById('badges-container');
   if (!container) return;
-  var result = await _supabase
+  var result = await window._supabase
     .from('Badges')
     .select('"Name", "Notes", "URL", "Badge Image URL", "Season", "Start Date", "End Date", "Badge #"')
     .order('"Badge #"', { ascending: true });
@@ -133,6 +214,9 @@ window.loadBadges = async function() {
 
 
 
+// ========================================
+// COURT DIRECTORY
+// ========================================
 window.addEventListener('load', function() {
   if (document.getElementById('courts-container')) {
     window.loadCourts();
@@ -147,7 +231,7 @@ window.loadCourts = async function() {
   var state = document.getElementById('courts-state') ? document.getElementById('courts-state').value : '';
   var type = document.getElementById('courts-type') ? document.getElementById('courts-type').value : '';
   var verified = document.getElementById('courts-verified') ? document.getElementById('courts-verified').value : '';
-  var result = await _supabase
+  var result = await window._supabase
     .from('Courts')
     .select('"Court ID", "Court Name", "Address", "City", "State", "Zip Code", "Country", "Indoor or Outdoor", "Verified?"')
     .order('"Court Name"', { ascending: true });
@@ -229,6 +313,9 @@ window.loadCourts = async function() {
 
 
 
+// ========================================
+// USERNAME CHECKER (signup page variant 1)
+// ========================================
 var usernameAvailable = false;
 var usernameTimeout;
 
@@ -258,7 +345,7 @@ window.addEventListener('load', function() {
     result.innerHTML = '<span style="color:#888;">Checking...</span>';
     clearTimeout(usernameTimeout);
     usernameTimeout = setTimeout(async function() {
-      var response = await _supabase
+      var response = await window._supabase
         .from('Players')
         .select('"Username"')
         .ilike('"Username"', username)
@@ -281,6 +368,9 @@ window.addEventListener('load', function() {
 
 
 
+// ========================================
+// USERNAME CHECKER (variant 2)
+// ========================================
 var usernameAvailable2 = false;
 var usernameTimeout2;
 
@@ -302,7 +392,7 @@ window.addEventListener('load', function() {
     result.innerHTML = '<span style="color:#888;">Checking...</span>';
     clearTimeout(usernameTimeout2);
     usernameTimeout2 = setTimeout(async function() {
-      var response = await _supabase
+      var response = await window._supabase
         .from('Players')
         .select('"Username"')
         .ilike('"Username"', username)
@@ -325,6 +415,9 @@ window.addEventListener('load', function() {
 
 
 
+// ========================================
+// SOCIAL FEED
+// ========================================
 var currentPlayerEmail = null;
 var currentPlayerProfileNumber = null;
 var socialFeedPage = 0;
@@ -334,26 +427,12 @@ var POSTS_PER_LOAD = 10;
 
 window.addEventListener('load', async function() {
   if (!document.getElementById('social-feed-container')) return;
-  
-  if (window.$memberstackDom) {
-    try {
-      var memberData = await window.$memberstackDom.getCurrentMember();
-      if (memberData && memberData.data) {
-        currentPlayerEmail = memberData.data.auth.email;
-var playerResult = await _supabase
-  .from('Players')
-  .select('"player_id", "Email"')
-  .eq('"Email"', currentPlayerEmail)
-  .limit(1);
-if (playerResult.data && playerResult.data.length > 0) {
-  currentPlayerProfileNumber = playerResult.data[0].player_id;
-}
-      }
-    } catch (e) {
-      console.error('Memberstack error:', e);
-    }
-  }
-  
+
+  // REPLACED: was window.$memberstackDom block
+  var player = await getCurrentPlayer();
+  currentPlayerEmail = player.email;
+  currentPlayerProfileNumber = player.playerId;
+
   window.initSocialFeed();
 });
 
@@ -388,11 +467,11 @@ window.loadMoreSocialFeed = async function() {
   var from = socialFeedPage * POSTS_PER_LOAD;
   var to = from + POSTS_PER_LOAD - 1;
 
-var result = await _supabase
-  .from('Social Feed')
-  .select('"Feed Posts", "Post", "Attachments", "Players", "Court Name", "Date", "player_id"')
-  .order('"Date"', { ascending: false })
-  .range(from, to);
+  var result = await window._supabase
+    .from('Social Feed')
+    .select('"Feed Posts", "Post", "Attachments", "Players", "Court Name", "Date", "player_id"')
+    .order('"Date"', { ascending: false })
+    .range(from, to);
 
   var data = result.data;
   var error = result.error;
@@ -411,7 +490,7 @@ var result = await _supabase
 
   var postsContainer = document.getElementById('social-feed-posts');
   var newPosts = data.map(function(post) {
-var isOwner = currentPlayerProfileNumber && post.player_id == currentPlayerProfileNumber;
+    var isOwner = currentPlayerProfileNumber && post.player_id == currentPlayerProfileNumber;
     var deleteBtn = isOwner
       ? '<button onclick="deletePost(\'' + post['Feed Posts'] + '\')" style="padding:8px 16px;background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">Delete Post</button>'
       : '';
@@ -452,7 +531,7 @@ window.reportPost = async function(postId) {
   if (!currentPlayerEmail) { alert('You must be logged in to report a post.'); return; }
   var reason = prompt('Why are you reporting this post? (inappropriate, harassment, spam)');
   if (!reason) return;
-  var insert = await _supabase
+  var insert = await window._supabase
     .from('Report Dashboard')
     .insert({
       post_id: postId,
@@ -461,18 +540,18 @@ window.reportPost = async function(postId) {
       reported_at: new Date().toISOString()
     });
   if (insert.error) { console.error(insert.error); alert('Error submitting report. Please try again.'); return; }
-  await _supabase.rpc('increment_report_count', { post_id: postId });
+  await window._supabase.rpc('increment_report_count', { post_id: postId });
   alert('Report submitted. Thank you.');
 };
 
 window.deletePost = async function(postId) {
   if (!currentPlayerProfileNumber) { alert('You must be logged in to delete a post.'); return; }
   if (!confirm('Are you sure you want to delete this post?')) return;
-var result = await _supabase
-  .from('Social Feed')
-  .delete()
-  .eq('"Feed Posts"', postId)
-  .eq('"player_id"', currentPlayerProfileNumber);
+  var result = await window._supabase
+    .from('Social Feed')
+    .delete()
+    .eq('"Feed Posts"', postId)
+    .eq('"player_id"', currentPlayerProfileNumber);
   if (result.error) { alert('Error deleting post. Please try again.'); return; }
   socialFeedPage = 0;
   socialFeedDone = false;
@@ -484,28 +563,17 @@ var result = await _supabase
 
 
 
+// ========================================
+// PLAYER SEARCH
+// ========================================
 window.addEventListener('load', async function() {
   if (!document.getElementById('player-search-container')) return;
-  
-  if (window.$memberstackDom) {
-    try {
-      var memberData = await window.$memberstackDom.getCurrentMember();
-      if (memberData && memberData.data) {
-        currentPlayerEmail = memberData.data.auth.email;
-        var playerResult = await _supabase
-          .from('Players')
-          .select('"player_id", "Email"')
-          .eq('"Email"', currentPlayerEmail)
-          .limit(1);
-        if (playerResult.data && playerResult.data.length > 0) {
-          currentPlayerProfileNumber = playerResult.data[0].player_id;
-        }
-      }
-    } catch (e) {
-      console.error('Memberstack error:', e);
-    }
-  }
-  
+
+  // REPLACED: was window.$memberstackDom block
+  var player = await getCurrentPlayer();
+  currentPlayerEmail = player.email;
+  currentPlayerProfileNumber = player.playerId;
+
   window.initPlayerSearch();
 });
 
@@ -533,7 +601,7 @@ window.searchPlayers = function() {
 
     var query = input ? input.value.trim() : '';
 
-    var request = _supabase
+    var request = window._supabase
       .from('Players')
       .select('"player_id", "Username", "Tier", "State/Province", "Country", "Profile Photo URL"')
       .order('"Username"', { ascending: true })
@@ -588,7 +656,7 @@ window.sendFriendRequest = async function(receiverId, receiverUsername, btn) {
   btn.disabled = true;
   btn.innerText = 'Sending...';
 
-  var existing = await _supabase
+  var existing = await window._supabase
     .from('Friend Requests')
     .select('id, status')
     .eq('requester_id', currentPlayerProfileNumber)
@@ -601,7 +669,7 @@ window.sendFriendRequest = async function(receiverId, receiverUsername, btn) {
     return;
   }
 
-  var insert = await _supabase
+  var insert = await window._supabase
     .from('Friend Requests')
     .insert({
       requester_id: currentPlayerProfileNumber,
@@ -622,28 +690,18 @@ window.sendFriendRequest = async function(receiverId, receiverUsername, btn) {
 };
 
 
+
+// ========================================
+// FRIENDS DASHBOARD
+// ========================================
 window.addEventListener('load', async function() {
   if (!document.getElementById('friends-dashboard-container')) return;
-  
-  if (window.$memberstackDom) {
-    try {
-      var memberData = await window.$memberstackDom.getCurrentMember();
-      if (memberData && memberData.data) {
-        currentPlayerEmail = memberData.data.auth.email;
-        var playerResult = await _supabase
-          .from('Players')
-          .select('"player_id", "Email"')
-          .eq('"Email"', currentPlayerEmail)
-          .limit(1);
-        if (playerResult.data && playerResult.data.length > 0) {
-          currentPlayerProfileNumber = playerResult.data[0].player_id;
-        }
-      }
-    } catch (e) {
-      console.error('Memberstack error:', e);
-    }
-  }
-  
+
+  // REPLACED: was window.$memberstackDom block
+  var player = await getCurrentPlayer();
+  currentPlayerEmail = player.email;
+  currentPlayerProfileNumber = player.playerId;
+
   window.loadFriendsDashboard();
 });
 
@@ -656,7 +714,7 @@ window.loadFriendsDashboard = async function() {
     return;
   }
 
-  var pendingResult = await _supabase
+  var pendingResult = await window._supabase
     .from('Friend Requests')
     .select('id, requester_id, created_at')
     .eq('receiver_id', currentPlayerProfileNumber)
@@ -667,14 +725,14 @@ window.loadFriendsDashboard = async function() {
   var requesterIds = pendingRequests.map(function(r) { return r.requester_id; });
   var requesterMap = {};
   if (requesterIds.length > 0) {
-    var requestersResult = await _supabase
+    var requestersResult = await window._supabase
       .from('Players')
       .select('"player_id", "Username", "Tier", "State/Province", "Country", "Profile Photo URL"')
       .in('player_id', requesterIds);
     (requestersResult.data || []).forEach(function(p) { requesterMap[p.player_id] = p; });
   }
 
-  var friendshipsResult = await _supabase
+  var friendshipsResult = await window._supabase
     .from('Friendships')
     .select('*')
     .or('player_1_id.eq.' + currentPlayerProfileNumber + ',player_2_id.eq.' + currentPlayerProfileNumber);
@@ -686,7 +744,7 @@ window.loadFriendsDashboard = async function() {
 
   var friendsMap = {};
   if (friendIds.length > 0) {
-    var friendsResult = await _supabase
+    var friendsResult = await window._supabase
       .from('Players')
       .select('"player_id", "Username", "Tier", "State/Province", "Country", "Profile Photo URL"')
       .in('player_id', friendIds);
@@ -745,7 +803,7 @@ window.loadFriendsDashboard = async function() {
 window.acceptFriendRequest = async function(requestId, requesterId) {
   if (!currentPlayerProfileNumber) return;
 
-  var updateResult = await _supabase
+  var updateResult = await window._supabase
     .from('Friend Requests')
     .update({ status: 'accepted' })
     .eq('id', requestId);
@@ -759,7 +817,7 @@ window.acceptFriendRequest = async function(requestId, requesterId) {
   var p1 = Math.min(requesterId, currentPlayerProfileNumber);
   var p2 = Math.max(requesterId, currentPlayerProfileNumber);
 
-  var insertResult = await _supabase
+  var insertResult = await window._supabase
     .from('Friendships')
     .insert({
       player_1_id: p1,
@@ -774,7 +832,7 @@ window.acceptFriendRequest = async function(requestId, requesterId) {
 };
 
 window.declineFriendRequest = async function(requestId) {
-  var result = await _supabase
+  var result = await window._supabase
     .from('Friend Requests')
     .delete()
     .eq('id', requestId);
@@ -794,7 +852,7 @@ window.removeFriend = async function(friendId) {
   var p1 = Math.min(friendId, currentPlayerProfileNumber);
   var p2 = Math.max(friendId, currentPlayerProfileNumber);
 
-  var friendshipResult = await _supabase
+  var friendshipResult = await window._supabase
     .from('Friendships')
     .delete()
     .eq('player_1_id', p1)
@@ -806,7 +864,7 @@ window.removeFriend = async function(friendId) {
     return;
   }
 
-  await _supabase
+  await window._supabase
     .from('Friend Requests')
     .delete()
     .or('and(requester_id.eq.' + currentPlayerProfileNumber + ',receiver_id.eq.' + friendId + '),and(requester_id.eq.' + friendId + ',receiver_id.eq.' + currentPlayerProfileNumber + ')');
@@ -816,28 +874,17 @@ window.removeFriend = async function(friendId) {
 
 
 
+// ========================================
+// VERIFY SESSIONS
+// ========================================
 window.addEventListener('load', async function() {
   if (!document.getElementById('verify-sessions-container')) return;
-  
-  if (window.$memberstackDom) {
-    try {
-      var memberData = await window.$memberstackDom.getCurrentMember();
-      if (memberData && memberData.data) {
-        currentPlayerEmail = memberData.data.auth.email;
-        var playerResult = await _supabase
-          .from('Players')
-          .select('"player_id", "Email"')
-          .eq('"Email"', currentPlayerEmail)
-          .limit(1);
-        if (playerResult.data && playerResult.data.length > 0) {
-          currentPlayerProfileNumber = playerResult.data[0].player_id;
-        }
-      }
-    } catch (e) {
-      console.error('Memberstack error:', e);
-    }
-  }
-  
+
+  // REPLACED: was window.$memberstackDom block
+  var player = await getCurrentPlayer();
+  currentPlayerEmail = player.email;
+  currentPlayerProfileNumber = player.playerId;
+
   window.loadVerifySessions();
 });
 
@@ -850,7 +897,7 @@ window.loadVerifySessions = async function() {
     return;
   }
 
-  var mySessionsResult = await _supabase
+  var mySessionsResult = await window._supabase
     .from('Sessions Forms')
     .select('"Session ID", court_id, "Start Time", "End Time"')
     .eq('player_id', currentPlayerProfileNumber)
@@ -867,7 +914,7 @@ window.loadVerifySessions = async function() {
     return;
   }
 
-  var myVerificationsResult = await _supabase
+  var myVerificationsResult = await window._supabase
     .from('Verifications')
     .select('session_id')
     .eq('verifier_id', currentPlayerProfileNumber);
@@ -876,22 +923,19 @@ window.loadVerifySessions = async function() {
 
   var courtIds = [...new Set(mySessions.map(function(s) { return s.court_id; }))];
 
-var threeDaysAgo = new Date();
-threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  var threeDaysAgo = new Date();
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
-var threeDaysAgo = new Date();
-threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  var eligibleResult = await window._supabase
+    .from('Sessions Forms')
+    .select('"Session ID", player_id, player_username, court_id, "Start Time", "End Time", "Images", "Verified? or Review?"')
+    .in('court_id', courtIds)
+    .not('"End Time"', 'is', null)
+    .gte('"End Time"', threeDaysAgo.toISOString())
+    .neq('player_id', currentPlayerProfileNumber)
+    .order('"Start Time"', { ascending: false });
 
-var eligibleResult = await _supabase
-  .from('Sessions Forms')
-  .select('"Session ID", player_id, player_username, court_id, "Start Time", "End Time", "Images", "Verified? or Review?"')
-  .in('court_id', courtIds)
-  .not('"End Time"', 'is', null)
-  .gte('"End Time"', threeDaysAgo.toISOString())
-  .neq('player_id', currentPlayerProfileNumber)
-  .order('"Start Time"', { ascending: false });
-
-var candidateSessions = eligibleResult.data || [];
+  var candidateSessions = eligibleResult.data || [];
 
   var eligibleSessions = candidateSessions.filter(function(theirSession) {
     if (alreadyVerifiedIds.indexOf(theirSession['Session ID']) !== -1) return false;
@@ -907,7 +951,7 @@ var candidateSessions = eligibleResult.data || [];
     });
   });
 
-  var courtsResult = await _supabase
+  var courtsResult = await window._supabase
     .from('Courts')
     .select('"Court ID", "Court Name"')
     .in('"Court ID"', courtIds);
@@ -964,13 +1008,13 @@ var candidateSessions = eligibleResult.data || [];
 window.submitVerification = async function(sessionId, verifierSessionId, vote) {
   if (!currentPlayerProfileNumber) { alert('You must be logged in.'); return; }
 
-  var confirmMsg = vote === 'confirmed' 
-    ? 'Confirm you saw this player at this session?' 
+  var confirmMsg = vote === 'confirmed'
+    ? 'Confirm you saw this player at this session?'
     : 'Dispute this session? This should only be used if you were there and did NOT see this player.';
-  
+
   if (!confirm(confirmMsg)) return;
 
-  var result = await _supabase
+  var result = await window._supabase
     .from('Verifications')
     .insert({
       session_id: sessionId,
@@ -990,6 +1034,9 @@ window.submitVerification = async function(sessionId, verifierSessionId, vote) {
 
 
 
+// ========================================
+// LIVE COURT FEED
+// ========================================
 window.addEventListener('load', function() {
   if (document.getElementById('live-court-feed-container')) {
     window.initLiveCourtFeed();
@@ -1024,7 +1071,7 @@ window.initLiveCourtFeed = async function() {
 
   await window.loadLiveCourtFeedData();
 
-  liveCourtFeedSubscription = _supabase
+  liveCourtFeedSubscription = window._supabase
     .channel('live-court-feed-changes')
     .on('postgres_changes',
       { event: '*', schema: 'public', table: 'Sessions Forms' },
@@ -1038,14 +1085,14 @@ window.initLiveCourtFeed = async function() {
 window.liveCourtFeedData = [];
 
 window.loadLiveCourtFeedData = async function() {
-  var courtsResult = await _supabase
+  var courtsResult = await window._supabase
     .from('Courts')
     .select('"Court ID", "Court Name", "Address", "City", "State", "Country"')
     .order('"Court Name"', { ascending: true });
 
   var courts = courtsResult.data || [];
 
-  var activeSessionsResult = await _supabase
+  var activeSessionsResult = await window._supabase
     .from('Sessions Forms')
     .select('court_id')
     .is('"End Time"', null);
@@ -1114,6 +1161,11 @@ window.renderLiveCourtFeed = function() {
   }).join('');
 };
 
+
+
+// ========================================
+// SF PLAYER (Player-specific social feed)
+// ========================================
 var sfPlayerPage = 0;
 var sfPlayerLoading = false;
 var sfPlayerDone = false;
@@ -1121,22 +1173,22 @@ var sfPlayerTargetId = null;
 
 window.addEventListener('load', function() {
   if (!document.getElementById('sf-player-container')) return;
-  
+
   var urlParams = new URLSearchParams(window.location.search);
   sfPlayerTargetId = urlParams.get('player_profile_number');
-  
+
   if (!sfPlayerTargetId) {
     var personalDiv = document.getElementById('personal-player-number');
     if (personalDiv) {
       sfPlayerTargetId = (personalDiv.innerText || personalDiv.textContent || '').trim();
     }
   }
-  
+
   if (!sfPlayerTargetId) {
     document.getElementById('sf-player-container').innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">No player specified.</p>';
     return;
   }
-  
+
   window.initSFPlayer();
 });
 
@@ -1171,7 +1223,7 @@ window.loadMoreSFPlayer = async function() {
   var from = sfPlayerPage * POSTS_PER_LOAD;
   var to = from + POSTS_PER_LOAD - 1;
 
-  var result = await _supabase
+  var result = await window._supabase
     .from('Social Feed')
     .select('"Feed Posts", "Post", "Attachments", "Players", "Court Name", "Date", "player_id"')
     .eq('player_id', sfPlayerTargetId)
@@ -1227,26 +1279,31 @@ window.loadMoreSFPlayer = async function() {
   sfPlayerLoading = false;
 };
 
+
+
+// ========================================
+// BADGES EARNED (Player-specific)
+// ========================================
 var badgesEarnedPlayerTargetId = null;
 
 window.addEventListener('load', function() {
   if (!document.getElementById('badges-earned-player-container')) return;
-  
+
   var urlParams = new URLSearchParams(window.location.search);
   badgesEarnedPlayerTargetId = urlParams.get('player_profile_number');
-  
+
   if (!badgesEarnedPlayerTargetId) {
     var personalDiv = document.getElementById('personal-player-number');
     if (personalDiv) {
       badgesEarnedPlayerTargetId = (personalDiv.innerText || personalDiv.textContent || '').trim();
     }
   }
-  
+
   if (!badgesEarnedPlayerTargetId) {
     document.getElementById('badges-earned-player-container').innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">No player specified.</p>';
     return;
   }
-  
+
   window.loadBadgesEarnedPlayer();
 });
 
@@ -1254,14 +1311,14 @@ window.loadBadgesEarnedPlayer = async function() {
   var container = document.getElementById('badges-earned-player-container');
   if (!container) return;
 
-  var allBadgesResult = await _supabase
+  var allBadgesResult = await window._supabase
     .from('Badges')
     .select('"Name", "Notes", "URL", "Badge Image URL", "Season", "Start Date", "End Date", "Badge #"')
     .order('"Badge #"', { ascending: true });
 
   var allBadges = allBadgesResult.data || [];
 
-  var earnedResult = await _supabase
+  var earnedResult = await window._supabase
     .from('Player Badges')
     .select('"Badge", "Date"')
     .eq('player_id', badgesEarnedPlayerTargetId);
@@ -1317,27 +1374,18 @@ window.loadBadgesEarnedPlayer = async function() {
     + '</div>';
 };
 
+
+
+// ========================================
+// FRIENDS LEADERBOARD
+// ========================================
 window.addEventListener('load', async function() {
   if (!document.getElementById('friends-leaderboard-container')) return;
 
-  if (window.$memberstackDom) {
-    try {
-      var memberData = await window.$memberstackDom.getCurrentMember();
-      if (memberData && memberData.data) {
-        currentPlayerEmail = memberData.data.auth.email;
-        var playerResult = await _supabase
-          .from('Players')
-          .select('"player_id", "Email"')
-          .eq('"Email"', currentPlayerEmail)
-          .limit(1);
-        if (playerResult.data && playerResult.data.length > 0) {
-          currentPlayerProfileNumber = playerResult.data[0].player_id;
-        }
-      }
-    } catch (e) {
-      console.error('Memberstack error:', e);
-    }
-  }
+  // REPLACED: was window.$memberstackDom block
+  var player = await getCurrentPlayer();
+  currentPlayerEmail = player.email;
+  currentPlayerProfileNumber = player.playerId;
 
   window.loadFriendsLeaderboard();
 });
@@ -1351,7 +1399,7 @@ window.loadFriendsLeaderboard = async function() {
     return;
   }
 
-  var friendshipsResult = await _supabase
+  var friendshipsResult = await window._supabase
     .from('Friendships')
     .select('*')
     .or('player_1_id.eq.' + currentPlayerProfileNumber + ',player_2_id.eq.' + currentPlayerProfileNumber);
@@ -1363,7 +1411,7 @@ window.loadFriendsLeaderboard = async function() {
 
   var playerIds = friendIds.concat([currentPlayerProfileNumber]);
 
-  var playersResult = await _supabase
+  var playersResult = await window._supabase
     .from('Players')
     .select('"player_id", "Username", "Tier", "XP", "State/Province", "Country"')
     .in('player_id', playerIds)
@@ -1388,7 +1436,7 @@ window.loadFriendsLeaderboard = async function() {
     return '<tr style="' + rowStyle + '">'
       + '<td style="padding:12px 14px;color:#888;">' + (i + 1) + '</td>'
       + '<td style="padding:12px 14px;color:#111;">' + nameLabel + '</td>'
-+ '<td style="padding:12px 14px;"><span style="padding:2px 10px;background:#f5f5f5;color:#555;border-radius:4px;font-size:12px;">' + (p.Tier || 'N/A') + '</span></td>'
+      + '<td style="padding:12px 14px;"><span style="padding:2px 10px;background:#f5f5f5;color:#555;border-radius:4px;font-size:12px;">' + (p.Tier || 'N/A') + '</span></td>'
       + '<td style="padding:12px 14px;color:#111;font-weight:500;">' + (p.XP || 0) + '</td>'
       + '<td style="padding:12px 14px;color:#555;">' + (p['State/Province'] || 'N/A') + '</td>'
       + '<td style="padding:12px 14px;color:#555;">' + (p.Country || 'N/A') + '</td>'
@@ -1414,6 +1462,11 @@ window.loadFriendsLeaderboard = async function() {
     + '</div>';
 };
 
+
+
+// ========================================
+// GROUP LEADERBOARD
+// ========================================
 window.addEventListener('load', function() {
   if (document.getElementById('group-leaderboard-container')) {
     window.initGroupLeaderboard();
@@ -1438,7 +1491,7 @@ window.initGroupLeaderboard = function() {
 window.groupLeaderboardData = [];
 
 window.loadGroupLeaderboardData = async function() {
-  var groupsResult = await _supabase
+  var groupsResult = await window._supabase
     .from('Groups')
     .select('"id", "group_number", "group_name", "description", "created_by", "group_page_url"')
     .order('"group_number"', { ascending: true });
@@ -1450,7 +1503,7 @@ window.loadGroupLeaderboardData = async function() {
     return;
   }
 
-  var membersResult = await _supabase
+  var membersResult = await window._supabase
     .from('Group Members')
     .select('group_id');
 
@@ -1462,7 +1515,7 @@ window.loadGroupLeaderboardData = async function() {
   var creatorIds = [...new Set(groups.map(function(g) { return g.created_by; }).filter(Boolean))];
   var creatorMap = {};
   if (creatorIds.length > 0) {
-    var creatorsResult = await _supabase
+    var creatorsResult = await window._supabase
       .from('Players')
       .select('"player_id", "Username"')
       .in('player_id', creatorIds);
@@ -1516,27 +1569,18 @@ window.renderGroupLeaderboard = function() {
   }).join('');
 };
 
+
+
+// ========================================
+// GROUP PLAYER LEADERBOARD
+// ========================================
 window.addEventListener('load', async function() {
   if (!document.getElementById('group-player-leaderboard-container')) return;
 
-  if (window.$memberstackDom) {
-    try {
-      var memberData = await window.$memberstackDom.getCurrentMember();
-      if (memberData && memberData.data) {
-        currentPlayerEmail = memberData.data.auth.email;
-        var playerResult = await _supabase
-          .from('Players')
-          .select('"player_id", "Email"')
-          .eq('"Email"', currentPlayerEmail)
-          .limit(1);
-        if (playerResult.data && playerResult.data.length > 0) {
-          currentPlayerProfileNumber = playerResult.data[0].player_id;
-        }
-      }
-    } catch (e) {
-      console.error('Memberstack error:', e);
-    }
-  }
+  // REPLACED: was window.$memberstackDom block
+  var player = await getCurrentPlayer();
+  currentPlayerEmail = player.email;
+  currentPlayerProfileNumber = player.playerId;
 
   window.loadGroupPlayerLeaderboard();
 });
@@ -1553,7 +1597,7 @@ window.loadGroupPlayerLeaderboard = async function() {
     return;
   }
 
-  var groupResult = await _supabase
+  var groupResult = await window._supabase
     .from('Groups')
     .select('"id", "group_name"')
     .eq('group_number', groupNumber)
@@ -1567,7 +1611,7 @@ window.loadGroupPlayerLeaderboard = async function() {
   var groupId = groupResult.data[0].id;
   var groupName = groupResult.data[0].group_name;
 
-  var membersResult = await _supabase
+  var membersResult = await window._supabase
     .from('Group Members')
     .select('player_id')
     .eq('group_id', groupId);
@@ -1583,7 +1627,7 @@ window.loadGroupPlayerLeaderboard = async function() {
     return;
   }
 
-  var playersResult = await _supabase
+  var playersResult = await window._supabase
     .from('Players')
     .select('"player_id", "Username", "Tier", "XP", "State/Province", "Country"')
     .in('player_id', memberIds)
@@ -1629,6 +1673,11 @@ window.loadGroupPlayerLeaderboard = async function() {
     + '</div>';
 };
 
+
+
+// ========================================
+// SF GROUP (Group social feed)
+// ========================================
 var sfGroupMemberIds = [];
 var SF_GROUP_LIMIT = 5;
 
@@ -1643,7 +1692,7 @@ window.addEventListener('load', async function() {
     return;
   }
 
-  var groupResult = await _supabase
+  var groupResult = await window._supabase
     .from('Groups')
     .select('"id"')
     .eq('group_number', groupNumber)
@@ -1656,7 +1705,7 @@ window.addEventListener('load', async function() {
 
   var groupId = groupResult.data[0].id;
 
-  var membersResult = await _supabase
+  var membersResult = await window._supabase
     .from('Group Members')
     .select('player_id')
     .eq('group_id', groupId);
@@ -1679,7 +1728,7 @@ window.loadSFGroup = async function(groupNumber) {
     return;
   }
 
-  var result = await _supabase
+  var result = await window._supabase
     .from('Social Feed')
     .select('"Feed Posts", "Post", "Attachments", "Players", "Court Name", "Date", "player_id"')
     .in('player_id', sfGroupMemberIds)
@@ -1700,7 +1749,7 @@ window.loadSFGroup = async function(groupNumber) {
     return;
   }
 
-  var countResult = await _supabase
+  var countResult = await window._supabase
     .from('Social Feed')
     .select('"Feed Posts"', { count: 'exact', head: true })
     .in('player_id', sfGroupMemberIds);
@@ -1736,6 +1785,11 @@ window.loadSFGroup = async function(groupNumber) {
     + '</div>';
 };
 
+
+
+// ========================================
+// SIGNUP
+// ========================================
 window.addEventListener('load', function() {
   if (document.getElementById('signup-container')) {
     window.initSignup();
@@ -1817,7 +1871,7 @@ window.submitSignup = async function() {
   btn.disabled = true;
   btn.innerText = 'Creating account...';
 
-  var signUpResult = await _supabase.auth.signUp({
+  var signUpResult = await window._supabase.auth.signUp({
     email: email,
     password: password
   });
@@ -1832,7 +1886,7 @@ window.submitSignup = async function() {
 
   var authUserId = signUpResult.data.user.id;
 
-  var playerInsert = await _supabase
+  var playerInsert = await window._supabase
     .from('Players')
     .insert({
       auth_user_id: authUserId,
@@ -1859,6 +1913,8 @@ window.submitSignup = async function() {
   }, 1500);
 };
 
+
+
 // ========================================
 // SHARED CONFIG
 // ========================================
@@ -1874,16 +1930,7 @@ async function requireAuth() {
   return user;
 }
 
-// ========================================
-// PAGE ROUTING
-// ========================================
-document.addEventListener("DOMContentLoaded", function () {
-  const path = window.location.pathname;
-if (path.includes("/sign-in")) initLogin();
-  else if (path.includes("/username-setup")) initUsernameSetup();
-  else if (path.includes("/change-username")) initChangeUsername();
-  else if (path.includes("/profile-setup")) initProfileSetup();
-});
+
 
 // ========================================
 // /username-setup
@@ -1971,6 +2018,8 @@ async function initUsernameSetup() {
     window.location.href = "/profile-setup";
   });
 }
+
+
 
 // ========================================
 // /change-username
@@ -2075,6 +2124,8 @@ async function initChangeUsername() {
     window.location.href = "/sp-home";
   });
 }
+
+
 
 // ========================================
 // /profile-setup
@@ -2189,8 +2240,10 @@ async function initProfileSetup() {
   });
 }
 
+
+
 // ========================================
-// Shared styles (injected once per page)
+// Shared onboarding styles
 // ========================================
 function injectPopStyles() {
   if (document.getElementById("pop-onboarding-styles")) return;
@@ -2284,8 +2337,10 @@ function injectPopStyles() {
   document.head.appendChild(style);
 }
 
+
+
 // ========================================
-// /log-in
+// /sign-in
 // ========================================
 async function initLogin() {
   const container = document.getElementById("login-container");

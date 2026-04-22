@@ -1847,7 +1847,7 @@ window.submitSignup = async function() {
 const SUPABASE_URL = "https://wscsrjaylotmcabdwvde.supabase.co";
 const SUPABASE_KEY = "sb_publishable_soHoBbkJRmNbRiaDMpAWBg_BMLdyq2R";
 const BYTESCALE_API_KEY = "public_G22nhnC83CH88avhAZxjkQq4tdkn";
-const AUTH_LINK_COLUMN = "auth_id"; // ⚠️ CHANGE IF YOUR COLUMN IS NAMED DIFFERENTLY
+const AUTH_LINK_COLUMN = "auth_user_id";
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 

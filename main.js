@@ -1842,17 +1842,13 @@ window.submitSignup = async function() {
 };
 
 // ========================================
-// SHARED CONFIG (put near top of main.js)
+// SHARED CONFIG
 // ========================================
-const SUPABASE_URL = "https://wscsrjaylotmcabdwvde.supabase.co";
-const SUPABASE_KEY = "sb_publishable_soHoBbkJRmNbRiaDMpAWBg_BMLdyq2R";
 const BYTESCALE_API_KEY = "public_G22nhnC83CH88avhAZxjkQq4tdkn";
 const AUTH_LINK_COLUMN = "auth_user_id";
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
 async function requireAuth() {
-  const { data: { user } } = await sb.auth.getUser();
+  const { data: { user } } = await window._supabase.auth.getUser();
   if (!user) {
     window.location.href = "/log-in";
     return null;
@@ -1868,11 +1864,10 @@ document.addEventListener("DOMContentLoaded", function () {
   if (path.includes("/username-setup")) initUsernameSetup();
   else if (path.includes("/change-username")) initChangeUsername();
   else if (path.includes("/profile-setup")) initProfileSetup();
-  // keep your other page handlers here (leaderboard, feed, friends, etc.)
 });
 
 // ========================================
-// /username-setup  (new users, post-signup)
+// /username-setup
 // ========================================
 async function initUsernameSetup() {
   const container = document.getElementById("username-setup-container");
@@ -1915,7 +1910,7 @@ async function initUsernameSetup() {
     feedback.style.color = "#888";
 
     debounceTimer = setTimeout(async () => {
-      const { data, error } = await sb
+      const { data, error } = await window._supabase
         .from("Players")
         .select("player_id")
         .ilike("Username", value)
@@ -1940,7 +1935,7 @@ async function initUsernameSetup() {
     submitBtn.disabled = true;
     submitBtn.textContent = "Saving...";
 
-    const { error } = await sb
+    const { error } = await window._supabase
       .from("Players")
       .update({ "Username": input.value.trim() })
       .eq(AUTH_LINK_COLUMN, user.id);
@@ -1959,7 +1954,7 @@ async function initUsernameSetup() {
 }
 
 // ========================================
-// /change-username  (existing users)
+// /change-username
 // ========================================
 async function initChangeUsername() {
   const container = document.getElementById("change-username-container");
@@ -1968,7 +1963,7 @@ async function initChangeUsername() {
   const user = await requireAuth();
   if (!user) return;
 
-  const { data: currentPlayer } = await sb
+  const { data: currentPlayer } = await window._supabase
     .from("Players")
     .select("Username")
     .eq(AUTH_LINK_COLUMN, user.id)
@@ -2019,7 +2014,7 @@ async function initChangeUsername() {
     feedback.style.color = "#888";
 
     debounceTimer = setTimeout(async () => {
-      const { data, error } = await sb
+      const { data, error } = await window._supabase
         .from("Players")
         .select("player_id")
         .ilike("Username", value)
@@ -2044,7 +2039,7 @@ async function initChangeUsername() {
     submitBtn.disabled = true;
     submitBtn.textContent = "Saving...";
 
-    const { error } = await sb
+    const { error } = await window._supabase
       .from("Players")
       .update({ "Username": input.value.trim() })
       .eq(AUTH_LINK_COLUMN, user.id);
@@ -2158,7 +2153,7 @@ async function initProfileSetup() {
     if (favPlayer) updateData["Favorite Player"] = favPlayer;
     if (photoUrl) updateData["Profile Photo URL"] = photoUrl;
 
-    const { error } = await sb
+    const { error } = await window._supabase
       .from("Players")
       .update(updateData)
       .eq(AUTH_LINK_COLUMN, user.id);
@@ -2213,9 +2208,7 @@ function injectPopStyles() {
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
-    .pop-req {
-      color: #c00;
-    }
+    .pop-req { color: #c00; }
     .pop-input {
       width: 100%;
       padding: 12px 14px;

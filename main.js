@@ -1840,3 +1840,273 @@ window.submitSignup = async function() {
     window.location.href = '/username-setup';
   }, 1500);
 };
+
+// ========================================
+// SHARED CONFIG (put near top of main.js)
+// ========================================
+const SUPABASE_URL = "https://wscsrjaylotmcabdwvde.supabase.co";
+const SUPABASE_KEY = "sb_publishable_soHoBbkJRmNbRiaDMpAWBg_BMLdyq2R";
+const BYTESCALE_API_KEY = "public_G22nhnC83CH88avhAZxjkQq4tdkn";
+const AUTH_LINK_COLUMN = "auth_id"; // ⚠️ CHANGE IF YOUR COLUMN IS NAMED DIFFERENTLY
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function requireAuth() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    window.location.href = "/log-in";
+    return null;
+  }
+  return user;
+}
+
+// ========================================
+// PAGE ROUTING
+// ========================================
+document.addEventListener("DOMContentLoaded", function () {
+  const path = window.location.pathname;
+  if (path.includes("/username-setup")) initUsernameSetup();
+  else if (path.includes("/change-username")) initChangeUsername();
+  else if (path.includes("/profile-setup")) initProfileSetup();
+  // keep your other page handlers here (leaderboard, feed, friends, etc.)
+});
+
+// ========================================
+// /username-setup  (new users, post-signup)
+// ========================================
+async function initUsernameSetup() {
+  const user = await requireAuth();
+  if (!user) return;
+
+  const input = document.getElementById("username-input");
+  const feedback = document.getElementById("username-feedback");
+  const submitBtn = document.getElementById("submit-username-btn");
+  if (!input || !feedback || !submitBtn) return;
+
+  submitBtn.disabled = true;
+  let debounceTimer;
+  let isAvailable = false;
+
+  input.addEventListener("input", function () {
+    clearTimeout(debounceTimer);
+    const value = input.value.trim();
+    isAvailable = false;
+    submitBtn.disabled = true;
+
+    if (value.length < 6) {
+      feedback.textContent = "Must be at least 6 characters.";
+      feedback.style.color = "#888";
+      return;
+    }
+
+    feedback.textContent = "Checking...";
+    feedback.style.color = "#888";
+
+    debounceTimer = setTimeout(async () => {
+      const { data, error } = await sb
+        .from("Players")
+        .select("player_id")
+        .ilike("Username", value)
+        .limit(1);
+
+      if (error) { feedback.textContent = "Error checking username."; return; }
+
+      if (data && data.length > 0) {
+        feedback.textContent = "Username taken.";
+        feedback.style.color = "#c00";
+      } else {
+        feedback.textContent = "Available!";
+        feedback.style.color = "#0a0";
+        isAvailable = true;
+        submitBtn.disabled = false;
+      }
+    }, 400);
+  });
+
+  submitBtn.addEventListener("click", async function () {
+    if (!isAvailable) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Saving...";
+
+    const { error } = await sb
+      .from("Players")
+      .update({ "Username": input.value.trim() })
+      .eq(AUTH_LINK_COLUMN, user.id);
+
+    if (error) {
+      feedback.textContent = "Error saving. Try again.";
+      feedback.style.color = "#c00";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Continue";
+      console.error(error);
+      return;
+    }
+
+    window.location.href = "/profile-setup";
+  });
+}
+
+// ========================================
+// /change-username  (existing users)
+// ========================================
+async function initChangeUsername() {
+  const user = await requireAuth();
+  if (!user) return;
+
+  const { data: currentPlayer } = await sb
+    .from("Players")
+    .select("Username")
+    .eq(AUTH_LINK_COLUMN, user.id)
+    .single();
+
+  const currentDiv = document.getElementById("current-username");
+  if (currentDiv && currentPlayer) {
+    currentDiv.textContent = "Current: @" + currentPlayer.Username;
+  }
+
+  const input = document.getElementById("username-input");
+  const feedback = document.getElementById("username-feedback");
+  const submitBtn = document.getElementById("submit-username-btn");
+  if (!input || !feedback || !submitBtn) return;
+
+  submitBtn.disabled = true;
+  let debounceTimer;
+  let isAvailable = false;
+
+  input.addEventListener("input", function () {
+    clearTimeout(debounceTimer);
+    const value = input.value.trim();
+    isAvailable = false;
+    submitBtn.disabled = true;
+
+    if (value.length < 6) {
+      feedback.textContent = "Must be at least 6 characters.";
+      feedback.style.color = "#888";
+      return;
+    }
+
+    if (currentPlayer && value.toLowerCase() === currentPlayer.Username.toLowerCase()) {
+      feedback.textContent = "That's already your username.";
+      feedback.style.color = "#888";
+      return;
+    }
+
+    feedback.textContent = "Checking...";
+    feedback.style.color = "#888";
+
+    debounceTimer = setTimeout(async () => {
+      const { data, error } = await sb
+        .from("Players")
+        .select("player_id")
+        .ilike("Username", value)
+        .limit(1);
+
+      if (error) { feedback.textContent = "Error checking username."; return; }
+
+      if (data && data.length > 0) {
+        feedback.textContent = "Username taken.";
+        feedback.style.color = "#c00";
+      } else {
+        feedback.textContent = "Available!";
+        feedback.style.color = "#0a0";
+        isAvailable = true;
+        submitBtn.disabled = false;
+      }
+    }, 400);
+  });
+
+  submitBtn.addEventListener("click", async function () {
+    if (!isAvailable) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Saving...";
+
+    const { error } = await sb
+      .from("Players")
+      .update({ "Username": input.value.trim() })
+      .eq(AUTH_LINK_COLUMN, user.id);
+
+    if (error) {
+      feedback.textContent = "Error saving. Try again.";
+      feedback.style.color = "#c00";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Save";
+      console.error(error);
+      return;
+    }
+
+    window.location.href = "/sp-home";
+  });
+}
+
+// ========================================
+// /profile-setup  (Position, Top Skill, Favorite Player, Photo)
+// ========================================
+async function initProfileSetup() {
+  const user = await requireAuth();
+  if (!user) return;
+
+  const positionSelect = document.getElementById("position-select");
+  const skillSelect = document.getElementById("skill-select");
+  const favPlayerInput = document.getElementById("favorite-player-input");
+  const photoBtn = document.getElementById("photo-upload-btn");
+  const photoPreview = document.getElementById("photo-preview");
+  const photoStorage = document.getElementById("photo-url-storage");
+  const submitBtn = document.getElementById("submit-profile-btn");
+  if (!positionSelect || !skillSelect || !submitBtn) return;
+
+  photoBtn.addEventListener("click", function () {
+    const uploader = window.UploadWidget || (window.Bytescale && window.Bytescale.UploadWidget);
+    if (!uploader) { alert("Upload widget failed to load."); return; }
+
+    uploader.open({
+      apiKey: BYTESCALE_API_KEY,
+      maxFileCount: 1,
+      mimeTypes: ["image/jpeg", "image/png", "image/webp"],
+      editor: { images: { crop: true, cropShape: "circ", cropRatio: 1 } }
+    }).then(files => {
+      if (!files.length) return;
+      const url = files[0].fileUrl;
+      photoStorage.textContent = url;
+      photoPreview.src = url;
+      photoPreview.style.display = "block";
+      photoBtn.textContent = "Change Photo";
+    }).catch(err => console.error("Upload error:", err));
+  });
+
+  submitBtn.addEventListener("click", async function () {
+    const position = positionSelect.value;
+    const skill = skillSelect.value;
+    const favPlayer = favPlayerInput.value.trim();
+    const photoUrl = photoStorage.textContent.trim();
+
+    if (!position || !skill) {
+      alert("Please select a Position and Top Skill.");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Saving...";
+
+    const updateData = {
+      "Position": position,
+      "Top Skill": skill
+    };
+    if (favPlayer) updateData["Favorite Player"] = favPlayer;
+    if (photoUrl) updateData["Profile Photo URL"] = photoUrl;
+
+    const { error } = await sb
+      .from("Players")
+      .update(updateData)
+      .eq(AUTH_LINK_COLUMN, user.id);
+
+    if (error) {
+      alert("Error saving profile. Try again.");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Finish";
+      console.error(error);
+      return;
+    }
+
+    window.location.href = "/sp-home";
+  });
+}

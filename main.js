@@ -1875,15 +1875,27 @@ document.addEventListener("DOMContentLoaded", function () {
 // /username-setup  (new users, post-signup)
 // ========================================
 async function initUsernameSetup() {
+  const container = document.getElementById("username-setup-container");
+  if (!container) return;
+
   const user = await requireAuth();
   if (!user) return;
+
+  container.innerHTML = `
+    <div class="pop-form">
+      <h2 class="pop-title">Pick your username</h2>
+      <p class="pop-sub">This is how other players will find and tag you. Minimum 6 characters.</p>
+      <input type="text" id="username-input" class="pop-input" placeholder="Username" autocomplete="off" />
+      <div id="username-feedback" class="pop-feedback"></div>
+      <button id="submit-username-btn" class="pop-btn" disabled>Continue</button>
+    </div>
+  `;
+  injectPopStyles();
 
   const input = document.getElementById("username-input");
   const feedback = document.getElementById("username-feedback");
   const submitBtn = document.getElementById("submit-username-btn");
-  if (!input || !feedback || !submitBtn) return;
 
-  submitBtn.disabled = true;
   let debounceTimer;
   let isAvailable = false;
 
@@ -1950,6 +1962,9 @@ async function initUsernameSetup() {
 // /change-username  (existing users)
 // ========================================
 async function initChangeUsername() {
+  const container = document.getElementById("change-username-container");
+  if (!container) return;
+
   const user = await requireAuth();
   if (!user) return;
 
@@ -1959,17 +1974,25 @@ async function initChangeUsername() {
     .eq(AUTH_LINK_COLUMN, user.id)
     .single();
 
-  const currentDiv = document.getElementById("current-username");
-  if (currentDiv && currentPlayer) {
-    currentDiv.textContent = "Current: @" + currentPlayer.Username;
-  }
+  const currentText = currentPlayer && currentPlayer.Username
+    ? "Current: @" + currentPlayer.Username
+    : "";
+
+  container.innerHTML = `
+    <div class="pop-form">
+      <h2 class="pop-title">Change your username</h2>
+      <div id="current-username" class="pop-current">${currentText}</div>
+      <input type="text" id="username-input" class="pop-input" placeholder="New username" autocomplete="off" />
+      <div id="username-feedback" class="pop-feedback"></div>
+      <button id="submit-username-btn" class="pop-btn" disabled>Save</button>
+    </div>
+  `;
+  injectPopStyles();
 
   const input = document.getElementById("username-input");
   const feedback = document.getElementById("username-feedback");
   const submitBtn = document.getElementById("submit-username-btn");
-  if (!input || !feedback || !submitBtn) return;
 
-  submitBtn.disabled = true;
   let debounceTimer;
   let isAvailable = false;
 
@@ -1985,7 +2008,8 @@ async function initChangeUsername() {
       return;
     }
 
-    if (currentPlayer && value.toLowerCase() === currentPlayer.Username.toLowerCase()) {
+    if (currentPlayer && currentPlayer.Username
+        && value.toLowerCase() === currentPlayer.Username.toLowerCase()) {
       feedback.textContent = "That's already your username.";
       feedback.style.color = "#888";
       return;
@@ -2039,11 +2063,52 @@ async function initChangeUsername() {
 }
 
 // ========================================
-// /profile-setup  (Position, Top Skill, Favorite Player, Photo)
+// /profile-setup
 // ========================================
 async function initProfileSetup() {
+  const container = document.getElementById("profile-setup-container");
+  if (!container) return;
+
   const user = await requireAuth();
   if (!user) return;
+
+  container.innerHTML = `
+    <div class="pop-form">
+      <h2 class="pop-title">Set up your profile</h2>
+      <p class="pop-sub">Required fields help us build your player card. You can edit anytime.</p>
+
+      <label class="pop-label">Position <span class="pop-req">*</span></label>
+      <select id="position-select" class="pop-input">
+        <option value="">Select a position...</option>
+        <option value="Point Guard">Point Guard</option>
+        <option value="Shooting Guard">Shooting Guard</option>
+        <option value="Small Forward">Small Forward</option>
+        <option value="Power Forward">Power Forward</option>
+        <option value="Center">Center</option>
+      </select>
+
+      <label class="pop-label">Top Skill <span class="pop-req">*</span></label>
+      <select id="skill-select" class="pop-input">
+        <option value="">Select your top skill...</option>
+        <option value="Scoring">Scoring</option>
+        <option value="Passing">Passing</option>
+        <option value="Dribbling">Dribbling</option>
+        <option value="Rebounding">Rebounding</option>
+        <option value="Defending">Defending</option>
+      </select>
+
+      <label class="pop-label">Favorite Player</label>
+      <input type="text" id="favorite-player-input" class="pop-input" placeholder="e.g. Kobe Bryant" />
+
+      <label class="pop-label">Profile Photo</label>
+      <button type="button" id="photo-upload-btn" class="pop-btn-secondary">Upload Photo</button>
+      <img id="photo-preview" class="pop-preview" style="display:none;" alt="Profile preview" />
+      <div id="photo-url-storage" style="display:none;"></div>
+
+      <button id="submit-profile-btn" class="pop-btn">Finish</button>
+    </div>
+  `;
+  injectPopStyles();
 
   const positionSelect = document.getElementById("position-select");
   const skillSelect = document.getElementById("skill-select");
@@ -2052,7 +2117,6 @@ async function initProfileSetup() {
   const photoPreview = document.getElementById("photo-preview");
   const photoStorage = document.getElementById("photo-url-storage");
   const submitBtn = document.getElementById("submit-profile-btn");
-  if (!positionSelect || !skillSelect || !submitBtn) return;
 
   photoBtn.addEventListener("click", function () {
     const uploader = window.UploadWidget || (window.Bytescale && window.Bytescale.UploadWidget);
@@ -2109,4 +2173,101 @@ async function initProfileSetup() {
 
     window.location.href = "/sp-home";
   });
+}
+
+// ========================================
+// Shared styles (injected once per page)
+// ========================================
+function injectPopStyles() {
+  if (document.getElementById("pop-onboarding-styles")) return;
+  const style = document.createElement("style");
+  style.id = "pop-onboarding-styles";
+  style.textContent = `
+    .pop-form {
+      max-width: 440px;
+      margin: 40px auto;
+      padding: 32px;
+      font-family: inherit;
+    }
+    .pop-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0 0 8px 0;
+    }
+    .pop-sub {
+      font-size: 14px;
+      color: #666;
+      margin: 0 0 24px 0;
+      line-height: 1.4;
+    }
+    .pop-current {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 16px;
+    }
+    .pop-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin: 16px 0 6px 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .pop-req {
+      color: #c00;
+    }
+    .pop-input {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 16px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-sizing: border-box;
+      background: #fff;
+      font-family: inherit;
+    }
+    .pop-input:focus {
+      outline: none;
+      border-color: #000;
+    }
+    .pop-feedback {
+      min-height: 20px;
+      font-size: 13px;
+      margin: 8px 0 16px 0;
+    }
+    .pop-btn {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+    .pop-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .pop-btn-secondary {
+      padding: 10px 16px;
+      font-size: 14px;
+      background: #f2f2f2;
+      color: #000;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .pop-preview {
+      display: block;
+      width: 120px;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 50%;
+      margin: 16px 0;
+    }
+  `;
+  document.head.appendChild(style);
 }

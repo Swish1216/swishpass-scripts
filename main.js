@@ -1861,7 +1861,8 @@ async function requireAuth() {
 // ========================================
 document.addEventListener("DOMContentLoaded", function () {
   const path = window.location.pathname;
-  if (path.includes("/username-setup")) initUsernameSetup();
+  if (path.includes("/log-in")) initLogin();
+  else if (path.includes("/username-setup")) initUsernameSetup();
   else if (path.includes("/change-username")) initChangeUsername();
   else if (path.includes("/profile-setup")) initProfileSetup();
 });

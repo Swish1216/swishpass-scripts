@@ -1500,9 +1500,19 @@ window.loadFriendsLeaderboard = async function() {
 // ========================================
 // GROUP LEADERBOARD
 // ========================================
-window.addEventListener('load', function() {
-  if (document.getElementById('group-leaderboard-container')) {
+function tryInitGroupLeaderboard(attempts) {
+  attempts = attempts || 0;
+  var el = document.getElementById('group-leaderboard-container');
+  if (el) {
     window.initGroupLeaderboard();
+  } else if (attempts < 10) {
+    setTimeout(function() { tryInitGroupLeaderboard(attempts + 1); }, 300);
+  }
+}
+
+window.addEventListener('load', function() {
+  if (window.location.pathname === '/group-search') {
+    tryInitGroupLeaderboard();
   }
 });
 

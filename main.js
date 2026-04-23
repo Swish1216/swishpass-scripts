@@ -2876,10 +2876,10 @@ async function leaveGroup(group, members, currentPlayerId) {
     .eq('group_id', group.id)
     .eq('player_id', currentPlayerId);
 
-  if (error) {
+if (error) {
     alert('Failed to leave group. Please try again.');
   } else {
-';
+    window.location.href = 'https://swishpass.webflow.io/group-search';
   }
 }
 
@@ -2969,10 +2969,10 @@ async function deleteGroup(group) {
     .delete()
     .eq('id', group.id);
 
-  if (error) {
+if (error) {
     alert('Failed to delete group. Please try again.');
   } else {
-';
+    window.location.href = 'https://swishpass.webflow.io/group-search';
   }
 }
 

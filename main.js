@@ -2573,70 +2573,101 @@ async function getGroupByNumber(groupNumber) {
 // ============================================================
 
 async function initCreateGroup() {
+  const wrapper = document.querySelector('[data-group="create-form-wrapper"]');
   const form = document.querySelector('[data-group="create-form"]');
-  if (!form) return;
+  if (!wrapper || !form) return;
 
   const player = await getCurrentPlayer();
   if (!player.playerId) {
-    form.innerHTML = '<p>You must be logged in to create a group.</p>';
+    wrapper.innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">You must be logged in to create a group.</p>';
     return;
   }
 
-  form.addEventListener('submit', async function (e) {
-    e.preventDefault();
+  wrapper.innerHTML = `
+    <div style="max-width:480px;margin:40px auto;padding:32px;font-family:inherit;">
+      <h2 style="font-size:28px;font-weight:700;margin:0 0 8px;color:#111;">Create a Group</h2>
+      <p style="font-size:14px;color:#888;margin:0 0 24px;line-height:1.5;">Build your crew. Public groups are open to anyone — private groups are invite only.</p>
 
-    const groupName    = form.querySelector('[data-group="name"]').value.trim();
-    const description  = form.querySelector('[data-group="description"]').value.trim();
-    const isPrivate    = form.querySelector('[data-group="is-private"]').checked;
-    const errorEl      = form.querySelector('[data-group="error"]');
-    const submitBtn    = form.querySelector('[data-group="submit"]');
+      <label style="display:block;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 6px;color:#555;">Group Name <span style="color:#c00;">*</span></label>
+      <input
+        data-group="name"
+        type="text"
+        placeholder="e.g. Sunset Ballers"
+        maxlength="60"
+        style="width:100%;padding:12px 14px;font-size:15px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;color:#111;font-family:inherit;margin-bottom:16px;"
+      />
+
+      <label style="display:block;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 6px;color:#555;">Description</label>
+      <textarea
+        data-group="description"
+        placeholder="What's this group about?"
+        rows="3"
+        style="width:100%;padding:12px 14px;font-size:15px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;color:#111;font-family:inherit;resize:vertical;margin-bottom:16px;"
+      ></textarea>
+
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:14px 16px;border:1px solid #ddd;border-radius:8px;margin-bottom:24px;background:#fafafa;">
+        <input type="checkbox" data-group="is-private" style="width:16px;height:16px;accent-color:#378add;" />
+        <div>
+          <p style="font-size:14px;font-weight:500;color:#111;margin:0 0 2px;">Private Group</p>
+          <p style="font-size:12px;color:#888;margin:0;">Only players you add can join</p>
+        </div>
+      </label>
+
+      <p data-group="error" style="color:#e24b4a;font-size:13px;min-height:20px;margin:0 0 12px;"></p>
+
+      <button
+        data-group="submit"
+        style="width:100%;padding:14px;font-size:16px;font-weight:600;background:#111;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit;"
+      >Create Group</button>
+    </div>
+  `;
+
+  const nameInput    = wrapper.querySelector('[data-group="name"]');
+  const descInput    = wrapper.querySelector('[data-group="description"]');
+  const privateCheck = wrapper.querySelector('[data-group="is-private"]');
+  const errorEl      = wrapper.querySelector('[data-group="error"]');
+  const submitBtn    = wrapper.querySelector('[data-group="submit"]');
+
+  submitBtn.addEventListener('click', async () => {
+    const groupName   = nameInput.value.trim();
+    const description = descInput.value.trim();
+    const isPrivate   = privateCheck.checked;
+
+    errorEl.textContent = '';
 
     if (!groupName) {
-      if (errorEl) errorEl.textContent = 'Group name is required.';
+      errorEl.textContent = 'Group name is required.';
       return;
     }
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Creating...';
 
-    // Insert group row — trigger handles group_number and group_page_url
     const { data: groupData, error: groupError } = await window._supabase
       .from('Groups')
-      .insert([{
-        group_name:  groupName,
-        description: description || null,
-        created_by:  player.playerId,
-        is_private:  isPrivate
-      }])
+      .insert([{ group_name: groupName, description: description || null, created_by: player.playerId, is_private: isPrivate }])
       .select()
       .single();
 
     if (groupError || !groupData) {
-      if (errorEl) errorEl.textContent = 'Failed to create group. Please try again.';
+      errorEl.textContent = 'Failed to create group. Please try again.';
       submitBtn.disabled = false;
       submitBtn.textContent = 'Create Group';
       return;
     }
 
-    // Add creator as owner in Group Members
     const { error: memberError } = await window._supabase
       .from('Group Members')
-      .insert([{
-        group_id:  groupData.id,
-        player_id: player.playerId,
-        role:      'owner'
-      }]);
+      .insert([{ group_id: groupData.id, player_id: player.playerId, role: 'owner' }]);
 
     if (memberError) {
-      if (errorEl) errorEl.textContent = 'Group created but failed to set ownership. Contact support.';
+      errorEl.textContent = 'Group created but failed to set ownership. Contact support.';
       return;
     }
 
-    // Redirect to the new group's profile page
     window.location.href = groupData.group_page_url;
   });
 }
-
 // ============================================================
 // LOAD GROUP PROFILE — runs on /group-profiles
 // ============================================================
@@ -2647,27 +2678,18 @@ async function loadGroupProfile() {
 
   const groupNumber = await getGroupNumberFromURL();
   if (!groupNumber) {
-    container.innerHTML = '<p>Group not found.</p>';
+    container.innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">Group not found.</p>';
     return;
   }
 
   const group = await getGroupByNumber(groupNumber);
   if (!group) {
-    container.innerHTML = '<p>This group does not exist.</p>';
+    container.innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">This group does not exist.</p>';
     return;
   }
 
   const player = await getCurrentPlayer();
 
-  // Populate group info fields
-  const nameEl = document.querySelector('[data-group="group-name"]');
-  const descEl = document.querySelector('[data-group="group-description"]');
-  const privEl = document.querySelector('[data-group="group-privacy"]');
-  if (nameEl) nameEl.textContent = group.group_name;
-  if (descEl) descEl.textContent = group.description || '';
-  if (privEl) privEl.textContent = group.is_private ? 'Private' : 'Public';
-
-  // Load members
   const { data: members } = await window._supabase
     .from('Group Members')
     .select('player_id, role, joined_at')
@@ -2675,99 +2697,180 @@ async function loadGroupProfile() {
 
   if (!members) return;
 
-  // Get player details for each member
   const playerIds = members.map(m => m.player_id);
   const { data: players } = await window._supabase
     .from('Players')
-    .select('player_id, Username, Ranking')
+    .select('player_id, Username, Ranking, "Profile Photo URL"')
     .in('player_id', playerIds);
 
   const playerMap = {};
   if (players) players.forEach(p => { playerMap[p.player_id] = p; });
 
-  // Check current user's role in this group
   const myMembership = members.find(m => m.player_id === player.playerId);
-  const isOwner = myMembership && myMembership.role === 'owner';
+  const isOwner  = myMembership && myMembership.role === 'owner';
   const isMember = !!myMembership;
+  const canJoin  = !isMember && !group.is_private && player.playerId;
 
-  // Render members list
-  const listEl = document.querySelector('[data-group="members-list"]');
-  if (listEl) {
-    listEl.innerHTML = '';
-    members.forEach(m => {
-      const p = playerMap[m.player_id] || {};
-      const isMe = m.player_id === player.playerId;
-      const item = document.createElement('div');
-      item.className = 'group-member-item';
-      item.innerHTML = `
-        <span class="member-username">${p.Username || 'Unknown'}</span>
-        <span class="member-role">${m.role}</span>
-        ${isOwner && !isMe ? `<button data-action="remove-member" data-player-id="${m.player_id}" data-group-id="${group.id}">Remove</button>` : ''}
-      `;
-      listEl.appendChild(item);
+  // Build members list HTML
+  const membersHTML = members.map(m => {
+    const p = playerMap[m.player_id] || {};
+    const isMe = m.player_id === player.playerId;
+    const photo = p['Profile Photo URL']
+      ? `<img src="${p['Profile Photo URL']}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`
+      : `<div style="width:40px;height:40px;border-radius:50%;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#888;font-size:14px;font-weight:500;flex-shrink:0;">${(p.Username || '?').charAt(0).toUpperCase()}</div>`;
+    const roleBadge = m.role === 'owner'
+      ? `<span style="padding:2px 8px;background:#e6f1fb;color:#378add;border-radius:4px;font-size:11px;font-weight:500;">Owner</span>`
+      : `<span style="padding:2px 8px;background:#f5f5f5;color:#888;border-radius:4px;font-size:11px;">Member</span>`;
+    const removeBtn = isOwner && !isMe
+      ? `<button data-action="remove-member" data-player-id="${m.player_id}" style="padding:6px 12px;background:#fff;color:#e24b4a;border:1px solid #e24b4a;border-radius:6px;font-size:12px;cursor:pointer;margin-left:auto;">Remove</button>`
+      : '';
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f5f5f5;">
+        ${photo}
+        <div style="flex:1;min-width:0;">
+          <p style="font-size:14px;font-weight:500;color:#111;margin:0 0 2px;">${p.Username || 'Unknown'}${isMe ? ' <span style="font-size:11px;color:#378add;">(You)</span>' : ''}</p>
+          <p style="font-size:12px;color:#888;margin:0;">Rank #${p.Ranking || 'N/A'}</p>
+        </div>
+        ${roleBadge}
+        ${removeBtn}
+      </div>
+    `;
+  }).join('');
+
+  // Render full profile
+  container.innerHTML = `
+    <div style="padding:0 16px;max-width:640px;margin:0 auto;">
+
+      <!-- Group Header -->
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+        <div style="width:64px;height:64px;border-radius:14px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#555;flex-shrink:0;">
+          ${(group.group_name || '?').charAt(0).toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <h1 style="font-size:22px;font-weight:700;color:#111;margin:0 0 4px;">${group.group_name || 'Unnamed Group'}</h1>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:12px;color:#888;">${members.length} member${members.length === 1 ? '' : 's'}</span>
+            <span style="color:#ddd;">·</span>
+            <span style="padding:2px 8px;background:${group.is_private ? '#f5f5f5' : '#e6f4ea'};color:${group.is_private ? '#888' : '#2d7a3a'};border-radius:4px;font-size:11px;font-weight:500;">${group.is_private ? 'Private' : 'Public'}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Description -->
+      ${group.description ? `<p style="font-size:14px;color:#555;margin:0 0 24px;line-height:1.6;padding:14px 16px;background:#fafafa;border-radius:8px;border:1px solid #eee;">${group.description}</p>` : ''}
+
+      <!-- Join Button (public, non-member) -->
+      ${canJoin ? `
+        <button data-action="join-group" style="width:100%;padding:12px;font-size:15px;font-weight:600;background:#378add;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-bottom:24px;">
+          Join Group
+        </button>
+      ` : ''}
+
+      <!-- Members -->
+      <div style="background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;margin-bottom:20px;">
+        <div style="padding:14px 16px;border-bottom:1px solid #f0f0f0;">
+          <h2 style="font-size:15px;font-weight:600;color:#111;margin:0;">Members</h2>
+        </div>
+        ${membersHTML || '<p style="padding:2rem;text-align:center;color:#888;font-size:14px;">No members yet.</p>'}
+      </div>
+
+      <!-- Add Member (owner only) -->
+      ${isOwner ? `
+        <div style="background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;margin-bottom:20px;">
+          <div style="padding:14px 16px;border-bottom:1px solid #f0f0f0;">
+            <h2 style="font-size:15px;font-weight:600;color:#111;margin:0;">Add a Player</h2>
+          </div>
+          <div style="padding:16px;">
+            <input
+              data-group="add-member-search"
+              type="text"
+              placeholder="Search by username..."
+              style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;color:#111;font-family:inherit;"
+            />
+            <div data-group="add-member-results" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+            <p data-group="add-member-error" style="color:#e24b4a;font-size:13px;margin:8px 0 0;min-height:16px;"></p>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Transfer Ownership Panel (hidden until needed) -->
+      <div data-group="transfer-ownership-panel" style="display:none;background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;margin-bottom:20px;">
+        <div style="padding:14px 16px;border-bottom:1px solid #f0f0f0;">
+          <h2 style="font-size:15px;font-weight:600;color:#111;margin:0;">Transfer Ownership</h2>
+          <p style="font-size:13px;color:#888;margin:4px 0 0;">Choose a new owner before you leave.</p>
+        </div>
+        <div style="padding:16px;">
+          <select data-group="transfer-select" style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;color:#111;background:#fff;font-family:inherit;margin-bottom:12px;">
+            <option value="">Select new owner...</option>
+          </select>
+          <button data-action="confirm-transfer" style="width:100%;padding:12px;font-size:14px;font-weight:600;background:#111;color:#fff;border:none;border-radius:8px;cursor:pointer;">
+            Confirm Transfer &amp; Leave
+          </button>
+        </div>
+      </div>
+
+      <!-- Owner + Member Actions -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        ${isMember && !isOwner ? `
+          <button data-action="leave-group" style="flex:1;padding:12px;font-size:14px;font-weight:500;background:#fff;color:#e24b4a;border:1px solid #e24b4a;border-radius:8px;cursor:pointer;">
+            Leave Group
+          </button>
+        ` : ''}
+        ${isOwner ? `
+          <button data-action="leave-group" style="flex:1;padding:12px;font-size:14px;font-weight:500;background:#fff;color:#e24b4a;border:1px solid #e24b4a;border-radius:8px;cursor:pointer;">
+            Leave Group
+          </button>
+          <button data-action="delete-group" style="flex:1;padding:12px;font-size:14px;font-weight:500;background:#e24b4a;color:#fff;border:none;border-radius:8px;cursor:pointer;">
+            Delete Group
+          </button>
+        ` : ''}
+      </div>
+
+    </div>
+  `;
+
+  // Wire up remove buttons
+  container.querySelectorAll('[data-action="remove-member"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const targetPlayerId = parseInt(btn.dataset.playerId);
+      await removeMemberFromGroup(group.id, targetPlayerId, group.group_number);
     });
+  });
 
-    // Wire up remove buttons
-    listEl.querySelectorAll('[data-action="remove-member"]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const targetPlayerId = parseInt(btn.dataset.playerId);
-        await removeMemberFromGroup(group.id, targetPlayerId, group.group_number);
-      });
+  // Wire up join button
+  const joinBtn = container.querySelector('[data-action="join-group"]');
+  if (joinBtn && canJoin) {
+    joinBtn.addEventListener('click', async () => {
+      joinBtn.disabled = true;
+      joinBtn.textContent = 'Joining...';
+      const { error } = await window._supabase
+        .from('Group Members')
+        .insert([{ group_id: group.id, player_id: player.playerId, role: 'member' }]);
+      if (error) {
+        alert('Failed to join group. Please try again.');
+        joinBtn.disabled = false;
+        joinBtn.textContent = 'Join Group';
+      } else {
+        window.location.reload();
+      }
     });
   }
-
-  // Show/hide owner controls
-  const ownerControls = document.querySelector('[data-group="owner-controls"]');
-  if (ownerControls) ownerControls.style.display = isOwner ? 'block' : 'none';
-
-  // Show/hide member controls
-// Show/hide member controls (anyone in the group)
-  const memberControls = document.querySelector('[data-group="member-controls"]');
-  if (memberControls) memberControls.style.display = isMember ? 'block' : 'none';
-
-  // Show/hide join button (public group, not already a member)
-  const joinBtn = document.querySelector('[data-action="join-group"]');
-  if (joinBtn) {
-    const canJoin = !isMember && !group.is_private && player.playerId;
-    joinBtn.style.display = canJoin ? 'block' : 'none';
-    if (canJoin) {
-      joinBtn.addEventListener('click', async () => {
-        joinBtn.disabled = true;
-        joinBtn.textContent = 'Joining...';
-        const { error } = await window._supabase
-          .from('Group Members')
-          .insert([{ group_id: group.id, player_id: player.playerId, role: 'member' }]);
-        if (error) {
-          alert('Failed to join group. Please try again.');
-          joinBtn.disabled = false;
-          joinBtn.textContent = 'Join Group';
-        } else {
-          window.location.reload();
-        }
-      });
-    }
-  }
-
-  // Show/hide add member panel
-  const addPanel = document.querySelector('[data-group="add-member-panel"]');
-  if (addPanel) addPanel.style.display = isOwner ? 'block' : 'none';
 
   // Wire up add member search
-  initAddMember(group.id, members.map(m => m.player_id));
+  if (isOwner) initAddMember(group.id, members.map(m => m.player_id));
 
   // Wire up leave button
-  const leaveBtn = document.querySelector('[data-action="leave-group"]');
+  const leaveBtn = container.querySelector('[data-action="leave-group"]');
   if (leaveBtn && isMember) {
     leaveBtn.addEventListener('click', () => leaveGroup(group, members, player.playerId));
   }
 
   // Wire up delete button
-  const deleteBtn = document.querySelector('[data-action="delete-group"]');
+  const deleteBtn = container.querySelector('[data-action="delete-group"]');
   if (deleteBtn && isOwner) {
     deleteBtn.addEventListener('click', () => deleteGroup(group));
   }
 }
-
 // ============================================================
 // ADD MEMBER — search by username, owner only
 // ============================================================

@@ -75,18 +75,39 @@ async function autofillUser() {
 
   const { data: player } = await window._supabase
     .from("Players")
-    .select('"Username", "Email"')
+    .select('"Username", "Email", "Tier", "XP", "Position", "Top Skill", "Favorite Player", "Profile Photo URL", "State/Province", "Country", "Ranking", "MVP Count", "player_id"')
     .eq("auth_user_id", session.user.id)
     .single();
 
   if (!player) return;
 
-  document.querySelectorAll("[data-user='username']").forEach(el => {
-    el.textContent = player.Username || "";
+  const fields = {
+    "username":       player.Username,
+    "email":          player.Email,
+    "tier":           player.Tier,
+    "xp":             player.XP,
+    "position":       player.Position,
+    "top-skill":      player["Top Skill"],
+    "favorite-player": player["Favorite Player"],
+    "state":          player["State/Province"],
+    "country":        player.Country,
+    "ranking":        player.Ranking,
+    "mvp-count":      player["MVP Count"],
+    "player-id":      player.player_id,
+  };
+
+  Object.entries(fields).forEach(([key, value]) => {
+    document.querySelectorAll(`[data-user="${key}"]`).forEach(el => {
+      el.textContent = value ?? "";
+    });
   });
-  document.querySelectorAll("[data-user='email']").forEach(el => {
-    el.textContent = player.Email || "";
-  });
+
+  // Profile photo — sets src on <img> elements
+  if (player["Profile Photo URL"]) {
+    document.querySelectorAll('[data-user="photo"]').forEach(el => {
+      el.src = player["Profile Photo URL"];
+    });
+  }
 }
 
 

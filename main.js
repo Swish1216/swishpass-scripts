@@ -2536,3 +2536,436 @@ async function initChangePassword() {
     saveBtn.textContent = "Saved";
   });
 }
+
+// ============================================================
+// GROUPS — Shared helper
+// ============================================================
+
+async function getGroupNumberFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('group_number');
+}
+
+async function getGroupByNumber(groupNumber) {
+  const { data, error } = await window._supabase
+    .from('Groups')
+    .select('*')
+    .eq('group_number', groupNumber)
+    .limit(1);
+  if (error || !data || data.length === 0) return null;
+  return data[0];
+}
+
+// ============================================================
+// CREATE GROUP — runs on /create-group
+// ============================================================
+
+async function initCreateGroup() {
+  const form = document.querySelector('[data-group="create-form"]');
+  if (!form) return;
+
+  const player = await getCurrentPlayer();
+  if (!player.playerId) {
+    form.innerHTML = '<p>You must be logged in to create a group.</p>';
+    return;
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const groupName    = form.querySelector('[data-group="name"]').value.trim();
+    const description  = form.querySelector('[data-group="description"]').value.trim();
+    const isPrivate    = form.querySelector('[data-group="is-private"]').checked;
+    const errorEl      = form.querySelector('[data-group="error"]');
+    const submitBtn    = form.querySelector('[data-group="submit"]');
+
+    if (!groupName) {
+      if (errorEl) errorEl.textContent = 'Group name is required.';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+
+    // Insert group row — trigger handles group_number and group_page_url
+    const { data: groupData, error: groupError } = await window._supabase
+      .from('Groups')
+      .insert([{
+        group_name:  groupName,
+        description: description || null,
+        created_by:  player.playerId,
+        is_private:  isPrivate
+      }])
+      .select()
+      .single();
+
+    if (groupError || !groupData) {
+      if (errorEl) errorEl.textContent = 'Failed to create group. Please try again.';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Create Group';
+      return;
+    }
+
+    // Add creator as owner in Group Members
+    const { error: memberError } = await window._supabase
+      .from('Group Members')
+      .insert([{
+        group_id:  groupData.id,
+        player_id: player.playerId,
+        role:      'owner'
+      }]);
+
+    if (memberError) {
+      if (errorEl) errorEl.textContent = 'Group created but failed to set ownership. Contact support.';
+      return;
+    }
+
+    // Redirect to the new group's profile page
+    window.location.href = groupData.group_page_url;
+  });
+}
+
+// ============================================================
+// LOAD GROUP PROFILE — runs on /group-profiles
+// ============================================================
+
+async function loadGroupProfile() {
+  const container = document.querySelector('[data-group="profile-container"]');
+  if (!container) return;
+
+  const groupNumber = await getGroupNumberFromURL();
+  if (!groupNumber) {
+    container.innerHTML = '<p>Group not found.</p>';
+    return;
+  }
+
+  const group = await getGroupByNumber(groupNumber);
+  if (!group) {
+    container.innerHTML = '<p>This group does not exist.</p>';
+    return;
+  }
+
+  const player = await getCurrentPlayer();
+
+  // Populate group info fields
+  const nameEl = document.querySelector('[data-group="group-name"]');
+  const descEl = document.querySelector('[data-group="group-description"]');
+  const privEl = document.querySelector('[data-group="group-privacy"]');
+  if (nameEl) nameEl.textContent = group.group_name;
+  if (descEl) descEl.textContent = group.description || '';
+  if (privEl) privEl.textContent = group.is_private ? 'Private' : 'Public';
+
+  // Load members
+  const { data: members } = await window._supabase
+    .from('Group Members')
+    .select('player_id, role, joined_at')
+    .eq('group_id', group.id);
+
+  if (!members) return;
+
+  // Get player details for each member
+  const playerIds = members.map(m => m.player_id);
+  const { data: players } = await window._supabase
+    .from('Players')
+    .select('player_id, Username, Ranking')
+    .in('player_id', playerIds);
+
+  const playerMap = {};
+  if (players) players.forEach(p => { playerMap[p.player_id] = p; });
+
+  // Check current user's role in this group
+  const myMembership = members.find(m => m.player_id === player.playerId);
+  const isOwner = myMembership && myMembership.role === 'owner';
+  const isMember = !!myMembership;
+
+  // Render members list
+  const listEl = document.querySelector('[data-group="members-list"]');
+  if (listEl) {
+    listEl.innerHTML = '';
+    members.forEach(m => {
+      const p = playerMap[m.player_id] || {};
+      const isMe = m.player_id === player.playerId;
+      const item = document.createElement('div');
+      item.className = 'group-member-item';
+      item.innerHTML = `
+        <span class="member-username">${p.Username || 'Unknown'}</span>
+        <span class="member-role">${m.role}</span>
+        ${isOwner && !isMe ? `<button data-action="remove-member" data-player-id="${m.player_id}" data-group-id="${group.id}">Remove</button>` : ''}
+      `;
+      listEl.appendChild(item);
+    });
+
+    // Wire up remove buttons
+    listEl.querySelectorAll('[data-action="remove-member"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const targetPlayerId = parseInt(btn.dataset.playerId);
+        await removeMemberFromGroup(group.id, targetPlayerId, group.group_number);
+      });
+    });
+  }
+
+  // Show/hide owner controls
+  const ownerControls = document.querySelector('[data-group="owner-controls"]');
+  if (ownerControls) ownerControls.style.display = isOwner ? 'block' : 'none';
+
+  // Show/hide member controls
+  const memberControls = document.querySelector('[data-group="member-controls"]');
+  if (memberControls) memberControls.style.display = isMember ? 'block' : 'none';
+
+  // Show/hide add member panel
+  const addPanel = document.querySelector('[data-group="add-member-panel"]');
+  if (addPanel) addPanel.style.display = isOwner ? 'block' : 'none';
+
+  // Wire up add member search
+  initAddMember(group.id, members.map(m => m.player_id));
+
+  // Wire up leave button
+  const leaveBtn = document.querySelector('[data-action="leave-group"]');
+  if (leaveBtn && isMember) {
+    leaveBtn.addEventListener('click', () => leaveGroup(group, members, player.playerId));
+  }
+
+  // Wire up delete button
+  const deleteBtn = document.querySelector('[data-action="delete-group"]');
+  if (deleteBtn && isOwner) {
+    deleteBtn.addEventListener('click', () => deleteGroup(group));
+  }
+}
+
+// ============================================================
+// ADD MEMBER — search by username, owner only
+// ============================================================
+
+async function initAddMember(groupId, existingPlayerIds) {
+  const searchInput = document.querySelector('[data-group="add-member-search"]');
+  const resultsEl   = document.querySelector('[data-group="add-member-results"]');
+  const errorEl     = document.querySelector('[data-group="add-member-error"]');
+  if (!searchInput || !resultsEl) return;
+
+  let debounceTimer;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const query = searchInput.value.trim();
+    if (query.length < 3) {
+      resultsEl.innerHTML = '';
+      return;
+    }
+    debounceTimer = setTimeout(async () => {
+      const { data: players } = await window._supabase
+        .from('Players')
+        .select('player_id, Username')
+        .ilike('Username', `%${query}%`)
+        .limit(5);
+
+      resultsEl.innerHTML = '';
+      if (!players || players.length === 0) {
+        resultsEl.innerHTML = '<p>No players found.</p>';
+        return;
+      }
+
+      players.forEach(p => {
+        const alreadyMember = existingPlayerIds.includes(p.player_id);
+        const item = document.createElement('div');
+        item.className = 'add-member-result-item';
+        item.innerHTML = `
+          <span>${p.Username}</span>
+          <button 
+            data-action="confirm-add" 
+            data-player-id="${p.player_id}"
+            data-username="${p.Username}"
+            ${alreadyMember ? 'disabled' : ''}>
+            ${alreadyMember ? 'Already a member' : 'Add'}
+          </button>
+        `;
+        resultsEl.appendChild(item);
+      });
+
+      // Wire up add buttons
+      resultsEl.querySelectorAll('[data-action="confirm-add"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const newPlayerId = parseInt(btn.dataset.playerId);
+          const { error } = await window._supabase
+            .from('Group Members')
+            .insert([{ group_id: groupId, player_id: newPlayerId, role: 'member' }]);
+          if (error) {
+            if (errorEl) errorEl.textContent = 'Failed to add member.';
+          } else {
+            btn.textContent = 'Added ✓';
+            btn.disabled = true;
+            existingPlayerIds.push(newPlayerId);
+          }
+        });
+      });
+
+    }, 400);
+  });
+}
+
+// ============================================================
+// REMOVE MEMBER — owner only
+// ============================================================
+
+async function removeMemberFromGroup(groupId, targetPlayerId, groupNumber) {
+  const confirmed = confirm('Remove this player from the group?');
+  if (!confirmed) return;
+
+  const { error } = await window._supabase
+    .from('Group Members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('player_id', targetPlayerId);
+
+  if (error) {
+    alert('Failed to remove member. Please try again.');
+  } else {
+    // Reload the page to reflect the updated members list
+    window.location.href = 'https://swishpass.webflow.io/group-profiles?group_number=' + groupNumber;
+  }
+}
+
+// ============================================================
+// LEAVE GROUP — member initiated, owner must transfer first
+// ============================================================
+
+async function leaveGroup(group, members, currentPlayerId) {
+  const myMembership = members.find(m => m.player_id === currentPlayerId);
+  if (!myMembership) return;
+
+  const isOwner = myMembership.role === 'owner';
+  const otherMembers = members.filter(m => m.player_id !== currentPlayerId);
+
+  if (isOwner && otherMembers.length === 0) {
+    // Last member — prompt to delete instead
+    const confirmed = confirm('You are the only member. Leaving will delete the group. Continue?');
+    if (!confirmed) return;
+    await deleteGroup(group);
+    return;
+  }
+
+  if (isOwner && otherMembers.length > 0) {
+    // Must transfer ownership first
+    const transferPanel = document.querySelector('[data-group="transfer-ownership-panel"]');
+    if (transferPanel) {
+      transferPanel.style.display = 'block';
+      populateTransferOptions(otherMembers, group, currentPlayerId);
+    } else {
+      alert('You must transfer ownership before leaving. Use the Transfer Ownership option.');
+    }
+    return;
+  }
+
+  // Regular member — just leave
+  const confirmed = confirm('Leave this group?');
+  if (!confirmed) return;
+
+  const { error } = await window._supabase
+    .from('Group Members')
+    .delete()
+    .eq('group_id', group.id)
+    .eq('player_id', currentPlayerId);
+
+  if (error) {
+    alert('Failed to leave group. Please try again.');
+  } else {
+    window.location.href = '/dashboard';
+  }
+}
+
+// ============================================================
+// TRANSFER OWNERSHIP — populates dropdown before owner leaves
+// ============================================================
+
+async function populateTransferOptions(otherMembers, group, currentPlayerId) {
+  const select = document.querySelector('[data-group="transfer-select"]');
+  const confirmBtn = document.querySelector('[data-action="confirm-transfer"]');
+  if (!select || !confirmBtn) return;
+
+  // Get usernames for other members
+  const { data: players } = await window._supabase
+    .from('Players')
+    .select('player_id, Username')
+    .in('player_id', otherMembers.map(m => m.player_id));
+
+  select.innerHTML = '<option value="">Select new owner...</option>';
+  if (players) {
+    players.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.player_id;
+      opt.textContent = p.Username;
+      select.appendChild(opt);
+    });
+  }
+
+  confirmBtn.onclick = async () => {
+    const newOwnerId = parseInt(select.value);
+    if (!newOwnerId) {
+      alert('Please select a new owner.');
+      return;
+    }
+
+    // Update new owner's role
+    const { error: promoteError } = await window._supabase
+      .from('Group Members')
+      .update({ role: 'owner' })
+      .eq('group_id', group.id)
+      .eq('player_id', newOwnerId);
+
+    if (promoteError) {
+      alert('Failed to transfer ownership. Please try again.');
+      return;
+    }
+
+    // Update Groups.created_by
+    await window._supabase
+      .from('Groups')
+      .update({ created_by: newOwnerId })
+      .eq('id', group.id);
+
+    // Remove current owner from members
+    const { error: leaveError } = await window._supabase
+      .from('Group Members')
+      .delete()
+      .eq('group_id', group.id)
+      .eq('player_id', currentPlayerId);
+
+    if (leaveError) {
+      alert('Ownership transferred but failed to remove you from group. Contact support.');
+      return;
+    }
+
+    window.location.href = '/dashboard';
+  };
+}
+
+// ============================================================
+// DELETE GROUP — owner only
+// ============================================================
+
+async function deleteGroup(group) {
+  const confirmed = confirm(`Permanently delete "${group.group_name}"? This cannot be undone.`);
+  if (!confirmed) return;
+
+  // Delete all members first (FK safety)
+  await window._supabase
+    .from('Group Members')
+    .delete()
+    .eq('group_id', group.id);
+
+  // Delete the group
+  const { error } = await window._supabase
+    .from('Groups')
+    .delete()
+    .eq('id', group.id);
+
+  if (error) {
+    alert('Failed to delete group. Please try again.');
+  } else {
+    window.location.href = '/dashboard';
+  }
+}
+
+// ============================================================
+// PAGE INIT ROUTER — add these calls inside DOMContentLoaded
+// ============================================================
+// if (window.location.pathname === '/create-group') initCreateGroup();
+// if (window.location.pathname === '/group-profiles') loadGroupProfile();

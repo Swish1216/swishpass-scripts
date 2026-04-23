@@ -2721,8 +2721,32 @@ async function loadGroupProfile() {
   if (ownerControls) ownerControls.style.display = isOwner ? 'block' : 'none';
 
   // Show/hide member controls
+// Show/hide member controls (anyone in the group)
   const memberControls = document.querySelector('[data-group="member-controls"]');
   if (memberControls) memberControls.style.display = isMember ? 'block' : 'none';
+
+  // Show/hide join button (public group, not already a member)
+  const joinBtn = document.querySelector('[data-action="join-group"]');
+  if (joinBtn) {
+    const canJoin = !isMember && !group.is_private && player.playerId;
+    joinBtn.style.display = canJoin ? 'block' : 'none';
+    if (canJoin) {
+      joinBtn.addEventListener('click', async () => {
+        joinBtn.disabled = true;
+        joinBtn.textContent = 'Joining...';
+        const { error } = await window._supabase
+          .from('Group Members')
+          .insert([{ group_id: group.id, player_id: player.playerId, role: 'member' }]);
+        if (error) {
+          alert('Failed to join group. Please try again.');
+          joinBtn.disabled = false;
+          joinBtn.textContent = 'Join Group';
+        } else {
+          window.location.reload();
+        }
+      });
+    }
+  }
 
   // Show/hide add member panel
   const addPanel = document.querySelector('[data-group="add-member-panel"]');

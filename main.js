@@ -1,7 +1,7 @@
 // ========================================
 // GLOBAL AUTH GUARD — runs on every page
 // ========================================
-const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/username-setup", "/profile-setup"];
+const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/username-setup", "/profile-setup", "/forgot-password", "/change-password"];
 
 document.addEventListener("DOMContentLoaded", async function () {
   const path = window.location.pathname;
@@ -38,6 +38,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   else if (path.includes("/username-setup")) initUsernameSetup();
   else if (path.includes("/change-username")) initChangeUsername();
   else if (path.includes("/profile-setup")) initProfileSetup();
+  else if (path.includes("/change-password")) initChangePassword();
+  else if (path.includes("/forgot-password")) initForgotPassword();
 
   // Always run autofill on every page
   autofillUser();
@@ -2415,5 +2417,122 @@ async function initLogin() {
     }
 
     window.location.href = "/sp-home";
+  });
+}
+
+async function initForgotPassword() {
+  const container = document.getElementById("forgot-password-container");
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="pop-form">
+      <h2 class="pop-title">Reset your password</h2>
+      <p class="pop-sub">Enter your email and we'll send you a reset link.</p>
+      <input type="email" id="reset-email" class="pop-input" placeholder="you@example.com" />
+      <div id="reset-feedback" class="pop-feedback"></div>
+      <button id="send-reset-btn" class="pop-btn">Send Reset Link</button>
+      <p style="font-size:13px;color:#555;text-align:center;margin-top:16px;">
+        <a href="/sign-in" style="color:#378add;">Back to log in</a>
+      </p>
+    </div>
+  `;
+  injectPopStyles();
+
+  const emailInput = document.getElementById("reset-email");
+  const feedback = document.getElementById("reset-feedback");
+  const sendBtn = document.getElementById("send-reset-btn");
+
+  sendBtn.addEventListener("click", async function () {
+    const email = emailInput.value.trim();
+
+    if (!email) {
+      feedback.textContent = "Please enter your email.";
+      feedback.style.color = "#c00";
+      return;
+    }
+
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending...";
+
+    const { error } = await window._supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: "https://swishpass.webflow.io/change-password"
+    });
+
+    if (error) {
+      feedback.textContent = error.message;
+      feedback.style.color = "#c00";
+      sendBtn.disabled = false;
+      sendBtn.textContent = "Send Reset Link";
+      return;
+    }
+
+    feedback.textContent = "Check your email for a reset link.";
+    feedback.style.color = "#2d7a3a";
+    sendBtn.textContent = "Sent";
+  });
+}
+
+async function initChangePassword() {
+  const container = document.getElementById("change-password-container");
+  if (!container) return;
+
+  const user = await requireAuth();
+  if (!user) return;
+
+  container.innerHTML = `
+    <div class="pop-form">
+      <h2 class="pop-title">Change your password</h2>
+      <label class="pop-label">New Password</label>
+      <input type="password" id="new-password" class="pop-input" placeholder="At least 8 characters" />
+      <label class="pop-label">Confirm New Password</label>
+      <input type="password" id="confirm-password" class="pop-input" placeholder="Repeat new password" />
+      <div id="password-feedback" class="pop-feedback"></div>
+      <button id="save-password-btn" class="pop-btn">Save Password</button>
+    </div>
+  `;
+  injectPopStyles();
+
+  const newPasswordInput = document.getElementById("new-password");
+  const confirmPasswordInput = document.getElementById("confirm-password");
+  const feedback = document.getElementById("password-feedback");
+  const saveBtn = document.getElementById("save-password-btn");
+
+  saveBtn.addEventListener("click", async function () {
+    const newPassword = newPasswordInput.value;
+    const confirmPassword = confirmPasswordInput.value;
+
+    feedback.style.color = "#c00";
+
+    if (!newPassword || !confirmPassword) {
+      feedback.textContent = "Please fill in both fields.";
+      return;
+    }
+    if (newPassword.length < 8) {
+      feedback.textContent = "Password must be at least 8 characters.";
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      feedback.textContent = "Passwords don't match.";
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+
+    const { error } = await window._supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      feedback.textContent = error.message;
+      feedback.style.color = "#c00";
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save Password";
+      return;
+    }
+
+    feedback.textContent = "Password updated successfully.";
+    feedback.style.color = "#2d7a3a";
+    saveBtn.textContent = "Saved";
   });
 }

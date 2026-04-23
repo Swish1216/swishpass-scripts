@@ -40,6 +40,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   else if (path.includes("/profile-setup")) initProfileSetup();
   else if (path.includes("/change-password")) initChangePassword();
   else if (path.includes("/forgot-password")) initForgotPassword();
+  if (window.location.pathname === '/create-group') initCreateGroup();
+if (window.location.pathname === '/group-profiles') loadGroupProfile();
 
   // Always run autofill on every page
   autofillUser();

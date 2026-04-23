@@ -75,25 +75,35 @@ async function autofillUser() {
 
   const { data: player } = await window._supabase
     .from("Players")
-    .select('"Username", "Email", "Tier", "XP", "Position", "Top Skill", "Favorite Player", "Profile Photo URL", "State/Province", "Country", "Ranking", "MVP Count", "player_id"')
+    .select('"Username", "Email", "Tier", "XP", "Position", "Top Skill", "Favorite Player", "Profile Photo URL", "State/Province", "Country", "Ranking", "MVP Count", "player_id", "Created"')
     .eq("auth_user_id", session.user.id)
     .single();
 
   if (!player) return;
 
+  // Format the Created timestamp to MM/DD/YYYY
+  const createdFormatted = player.Created
+    ? new Date(player.Created).toLocaleDateString("en-US", {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric"
+      })
+    : "";
+
   const fields = {
-    "username":       player.Username,
-    "email":          player.Email,
-    "tier":           player.Tier,
-    "xp":             player.XP,
-    "position":       player.Position,
-    "top-skill":      player["Top Skill"],
+    "username":        player.Username,
+    "email":           player.Email,
+    "tier":            player.Tier,
+    "xp":              player.XP,
+    "position":        player.Position,
+    "top-skill":       player["Top Skill"],
     "favorite-player": player["Favorite Player"],
-    "state":          player["State/Province"],
-    "country":        player.Country,
-    "ranking":        player.Ranking,
-    "mvp-count":      player["MVP Count"],
-    "player-id":      player.player_id,
+    "state":           player["State/Province"],
+    "country":         player.Country,
+    "ranking":         player.Ranking,
+    "mvp-count":       player["MVP Count"],
+    "player-id":       player.player_id,
+    "created":         createdFormatted,
   };
 
   Object.entries(fields).forEach(([key, value]) => {
@@ -102,14 +112,12 @@ async function autofillUser() {
     });
   });
 
-  // Profile photo — sets src on <img> elements
   if (player["Profile Photo URL"]) {
     document.querySelectorAll('[data-user="photo"]').forEach(el => {
       el.src = player["Profile Photo URL"];
     });
   }
 }
-
 
 
 // ========================================

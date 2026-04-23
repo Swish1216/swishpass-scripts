@@ -2879,7 +2879,7 @@ async function leaveGroup(group, members, currentPlayerId) {
   if (error) {
     alert('Failed to leave group. Please try again.');
   } else {
-window.location.href = 'https://swishpass.webflow.io/group-search';
+';
   }
 }
 
@@ -2947,7 +2947,6 @@ async function populateTransferOptions(otherMembers, group, currentPlayerId) {
 
 window.location.href = 'https://swishpass.webflow.io/group-search';
 };
-};
 }
 
 // ============================================================
@@ -2973,7 +2972,7 @@ async function deleteGroup(group) {
   if (error) {
     alert('Failed to delete group. Please try again.');
   } else {
-window.location.href = 'https://swishpass.webflow.io/group-search';
+';
   }
 }
 

@@ -1,7 +1,22 @@
 // ========================================
 // GLOBAL AUTH GUARD — runs on every page
 // ========================================
-const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/username-setup", "/profile-setup", "/forgot-password", "/change-password"];
+const PUBLIC_PATHS = [
+  "/sign-in",
+  "/sign-up",
+  "/username-setup",
+  "/profile-setup",
+  "/forgot-password",
+  "/change-password",
+  "/home",
+  "/features",
+  "/pricing",
+  "/terms-and-conditions",
+  "/privacy-policy",
+  "/faq",
+  "/contact-us",
+  "/coming-soon"
+];
 
 document.addEventListener("DOMContentLoaded", async function () {
   const path = window.location.pathname;

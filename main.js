@@ -43,6 +43,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 if (window.location.pathname === '/groups') initCreateGroup();
 if (window.location.pathname === '/group-profiles') loadGroupProfile();
 
+  const signOutBtn = document.getElementById('sign-out-btn');
+  if (signOutBtn) signOutBtn.addEventListener('click', signOut);
+
   // Always run autofill on every page
   autofillUser();
 });
@@ -3103,20 +3106,23 @@ if (error) {
   }
 }
 
+
+
 // ============================================================
 // PAGE INIT ROUTER — add these calls inside DOMContentLoaded
 // ============================================================
 // if (window.location.pathname === '/create-group') initCreateGroup();
 // if (window.location.pathname === '/group-profiles') loadGroupProfile();
 
+// ============================================================
+// SIGN OUT
+// ============================================================
+
 async function signOut() {
-  const { error } = await supabase.auth.signOut();
+  const { error } = await window._supabase.auth.signOut();
   if (error) {
     console.error('Sign out error:', error);
     return;
   }
   window.location.href = '/sign-in';
 }
-
-const signOutBtn = document.getElementById('sign-out-btn');
-if (signOutBtn) signOutBtn.addEventListener('click', signOut);

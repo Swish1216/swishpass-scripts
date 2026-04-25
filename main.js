@@ -3108,3 +3108,15 @@ if (error) {
 // ============================================================
 // if (window.location.pathname === '/create-group') initCreateGroup();
 // if (window.location.pathname === '/group-profiles') loadGroupProfile();
+
+async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    console.error('Sign out error:', error);
+    return;
+  }
+  window.location.href = '/login';
+}
+
+const signOutBtn = document.getElementById('sign-out-btn');
+if (signOutBtn) signOutBtn.addEventListener('click', signOut);

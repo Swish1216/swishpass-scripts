@@ -3115,7 +3115,7 @@ async function signOut() {
     console.error('Sign out error:', error);
     return;
   }
-  window.location.href = '/login';
+  window.location.href = '/sign-in';
 }
 
 const signOutBtn = document.getElementById('sign-out-btn');

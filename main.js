@@ -4,6 +4,7 @@
 const PUBLIC_PATHS = [
   "/sign-in",
   "/sign-up",
+  "/confirm-email",
   "/username-setup",
   "/profile-setup",
   "/forgot-password",
@@ -29,6 +30,11 @@ document.addEventListener("DOMContentLoaded", async function () {
       window.location.href = "/sign-in";
       return;
     }
+    // Gate unconfirmed users to the confirm-email page
+if (!session.user.email_confirmed_at && !path.includes('/confirm-email')) {
+  window.location.href = '/confirm-email';
+  return;
+}
 
     // Redirect incomplete onboarding
     const { data: player } = await window._supabase
@@ -3141,3 +3147,102 @@ async function signOut() {
   }
   window.location.href = '/sign-in';
 }
+
+// ========================================
+// /confirm-email
+// ========================================
+window.addEventListener('load', async function () {
+  if (!document.getElementById('confirm-email-container')) return;
+
+  const container = document.getElementById('confirm-email-container');
+
+  // Handle the token from the email link (arrives in URL hash)
+  const hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    // Supabase picks this up automatically via onAuthStateChange,
+    // but we need to give it a moment to process
+    container.innerHTML = '<p style="text-align:center;padding:2rem;color:#888;">Verifying your email...</p>';
+
+    // Wait for session to resolve
+    await new Promise(resolve => setTimeout(resolve, 1200));
+
+    const { data: { session } } = await window._supabase.auth.getSession();
+    if (session && session.user.email_confirmed_at) {
+      window.location.href = '/username-setup';
+      return;
+    }
+  }
+
+  // Check if already confirmed (returning user who somehow landed here)
+  const { data: { session } } = await window._supabase.auth.getSession();
+  if (session && session.user.email_confirmed_at) {
+    // Already confirmed — check onboarding state
+    const { data: player } = await window._supabase
+      .from('Players')
+      .select('"Username", "Position"')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!player || !player.Username) {
+      window.location.href = '/username-setup';
+    } else if (!player.Position) {
+      window.location.href = '/profile-setup';
+    } else {
+      window.location.href = '/sp-home';
+    }
+    return;
+  }
+
+  // Not confirmed yet — show the holding screen
+  container.innerHTML = `
+    <div style="max-width:440px;margin:60px auto;padding:32px;text-align:center;font-family:inherit;">
+      <div style="font-size:48px;margin-bottom:16px;">📧</div>
+      <h2 style="font-size:24px;font-weight:700;color:#111;margin:0 0 8px;">Check your email</h2>
+      <p style="font-size:15px;color:#666;margin:0 0 24px;line-height:1.5;">
+        We sent a confirmation link to your email address. Click it to activate your account and continue setup.
+      </p>
+      <p style="font-size:13px;color:#888;margin:0 0 24px;">
+        Didn't get it? Check your spam folder — it may have landed there.
+      </p>
+      <button id="resend-confirmation-btn" onclick="resendConfirmation()" 
+        style="padding:12px 24px;background:#f2f2f2;color:#111;border:1px solid #ddd;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;">
+        Resend confirmation email
+      </button>
+      <p style="font-size:13px;color:#888;margin-top:24px;">
+        Wrong email? <a href="/sign-up" style="color:#378add;">Start over</a>
+      </p>
+    </div>
+  `;
+});
+
+window.resendConfirmation = async function () {
+  const btn = document.getElementById('resend-confirmation-btn');
+  const { data: { session } } = await window._supabase.auth.getSession();
+
+  if (!session) {
+    alert('Session expired. Please sign up again.');
+    window.location.href = '/sign-up';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  const { error } = await window._supabase.auth.resend({
+    type: 'signup',
+    email: session.user.email,
+    options: { emailRedirectTo: 'https://swishpass.webflow.io/confirm-email' }
+  });
+
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = 'Resend confirmation email';
+    alert('Error resending. Please try again.');
+  } else {
+    btn.textContent = 'Sent ✓';
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = 'Resend confirmation email';
+    }, 5000);
+  }
+};

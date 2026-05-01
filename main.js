@@ -1967,11 +1967,11 @@ window.submitSignup = async function() {
     return;
   }
 
-  messageEl.innerHTML = '<span style="color:#2d7a3a;">Account created! Redirecting to username setup...</span>';
+messageEl.innerHTML = '<span style="color:#2d7a3a;">Account created! Check your email to confirm your address.</span>';
 
-  setTimeout(function() {
-    window.location.href = '/username-setup';
-  }, 1500);
+setTimeout(function() {
+  window.location.href = '/confirm-email';
+}, 1500);
 };
 
 

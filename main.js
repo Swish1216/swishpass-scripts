@@ -163,9 +163,10 @@ window.loadLeaderboard = async function() {
   var search = document.getElementById('lb-search') ? document.getElementById('lb-search').value.toLowerCase() : '';
   var country = document.getElementById('lb-country') ? document.getElementById('lb-country').value : '';
   var state = document.getElementById('lb-state') ? document.getElementById('lb-state').value : '';
-  var result = await window._supabase
+var result = await window._supabase
     .from('Players')
     .select('"Username", "Tier", "XP", "State/Province", "Country"')
+    .eq('status', 'active')
     .order('"XP"', { ascending: false });
   var data = result.data;
   var error = result.error;
@@ -1472,6 +1473,7 @@ window.loadFriendsLeaderboard = async function() {
     .from('Players')
     .select('"player_id", "Username", "Tier", "XP", "State/Province", "Country"')
     .in('player_id', playerIds)
+    .eq('status', 'active')
     .order('"XP"', { ascending: false });
 
   var players = playersResult.data || [];
@@ -1698,6 +1700,7 @@ window.loadGroupPlayerLeaderboard = async function() {
     .from('Players')
     .select('"player_id", "Username", "Tier", "XP", "State/Province", "Country"')
     .in('player_id', memberIds)
+    .eq('status', 'active')
     .order('"XP"', { ascending: false });
 
   var players = playersResult.data || [];

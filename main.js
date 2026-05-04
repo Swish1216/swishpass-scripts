@@ -19,57 +19,108 @@ const PUBLIC_PATHS = [
   "/coming-soon"
 ];
 
-document.addEventListener("DOMContentLoaded", async function () {
+(function () {
   const path = window.location.pathname;
-  const isPublic = PUBLIC_PATHS.some(p => path.includes(p));
+  const isPublic = PUBLIC_PATHS.some(function (p) { return path.includes(p); });
 
-  if (!isPublic) {
-    const { data: { session } } = await window._supabase.auth.getSession();
+  if (isPublic) {
+    // Public page — still run page init on DOMContentLoaded
+    document.addEventListener("DOMContentLoaded", function () {
+      if (path.includes("/sign-in")) initLogin();
+      else if (path.includes("/username-setup")) initUsernameSetup();
+      else if (path.includes("/change-username")) initChangeUsername();
+      else if (path.includes("/profile-setup")) initProfileSetup();
+      else if (path.includes("/change-password")) initChangePassword();
+      else if (path.includes("/forgot-password")) initForgotPassword();
+      if (window.location.pathname === '/groups') initCreateGroup();
+      if (window.location.pathname === '/group-profiles') loadGroupProfile();
 
-    if (!session) {
-      window.location.href = "/sign-in";
-      return;
-    }
-    // Gate unconfirmed users to the confirm-email page
-if (!session.user.email_confirmed_at && !path.includes('/confirm-email')) {
-  window.location.href = '/confirm-email';
-  return;
-}
-
-    // Redirect incomplete onboarding
-    const { data: player } = await window._supabase
-      .from("Players")
-      .select("Username, Position")
-      .eq("auth_user_id", session.user.id)
-      .single();
-
-    if (!player || !player.Username) {
-      window.location.href = "/username-setup";
-      return;
-    }
-
-    if (!player.Position) {
-      window.location.href = "/profile-setup";
-      return;
-    }
+      const signOutBtn = document.getElementById('sign-out-btn');
+      if (signOutBtn) signOutBtn.addEventListener('click', signOut);
+    });
+    return;
   }
 
-  // Page routing
-  if (path.includes("/sign-in")) initLogin();
-  else if (path.includes("/username-setup")) initUsernameSetup();
-  else if (path.includes("/change-username")) initChangeUsername();
-  else if (path.includes("/profile-setup")) initProfileSetup();
-  else if (path.includes("/change-password")) initChangePassword();
-  else if (path.includes("/forgot-password")) initForgotPassword();
-if (window.location.pathname === '/groups') initCreateGroup();
-if (window.location.pathname === '/group-profiles') loadGroupProfile();
+  // Protected page — wait for Supabase to confirm auth state
+  var authTimeout = setTimeout(function () {
+    window.location.href = "/sign-in";
+  }, 3000);
 
-  const signOutBtn = document.getElementById('sign-out-btn');
-  if (signOutBtn) signOutBtn.addEventListener('click', signOut);
+  var authListener = window._supabase.auth.onAuthStateChange(function (event, session) {
+    if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      if (!session) {
+        clearTimeout(authTimeout);
+        window.location.href = "/sign-in";
+        return;
+      }
 
-  // Always run autofill on every page
-  autofillUser();
-});
+      // Gate unconfirmed users
+      if (!session.user.email_confirmed_at) {
+        clearTimeout(authTimeout);
+        window.location.href = '/confirm-email';
+        return;
+      }
+
+      // Check onboarding state
+      window._supabase
+        .from("Players")
+        .select("Username, Position")
+        .eq("auth_user_id", session.user.id)
+        .single()
+        .then(function (result) {
+          clearTimeout(authTimeout);
+          var player = result.data;
+
+          if (!player || !player.Username) {
+            window.location.href = "/username-setup";
+            return;
+          }
+          if (!player.Position) {
+            window.location.href = "/profile-setup";
+            return;
+          }
+
+          // All good — run page init
+          document.addEventListener("DOMContentLoaded", function () {
+            if (path.includes("/sign-in")) initLogin();
+            else if (path.includes("/username-setup")) initUsernameSetup();
+            else if (path.includes("/change-username")) initChangeUsername();
+            else if (path.includes("/profile-setup")) initProfileSetup();
+            else if (path.includes("/change-password")) initChangePassword();
+            else if (path.includes("/forgot-password")) initForgotPassword();
+            if (window.location.pathname === '/groups') initCreateGroup();
+            if (window.location.pathname === '/group-profiles') loadGroupProfile();
+
+            const signOutBtn = document.getElementById('sign-out-btn');
+            if (signOutBtn) signOutBtn.addEventListener('click', signOut);
+
+            autofillUser();
+          });
+
+          // If DOMContentLoaded already fired, run immediately
+          if (document.readyState === 'interactive' || document.readyState === 'complete') {
+            if (path.includes("/sign-in")) initLogin();
+            else if (path.includes("/username-setup")) initUsernameSetup();
+            else if (path.includes("/change-username")) initChangeUsername();
+            else if (path.includes("/profile-setup")) initProfileSetup();
+            else if (path.includes("/change-password")) initChangePassword();
+            else if (path.includes("/forgot-password")) initForgotPassword();
+            if (window.location.pathname === '/groups') initCreateGroup();
+            if (window.location.pathname === '/group-profiles') loadGroupProfile();
+
+            const signOutBtn = document.getElementById('sign-out-btn');
+            if (signOutBtn) signOutBtn.addEventListener('click', signOut);
+
+            autofillUser();
+          }
+        });
+
+    } else if (event === 'SIGNED_OUT') {
+      clearTimeout(authTimeout);
+      window.location.href = "/sign-in";
+    }
+  });
+})();
 
 // ========================================
 // SHARED SUPABASE AUTH HELPER

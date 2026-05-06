@@ -336,69 +336,70 @@ window.addEventListener('load', function() {
 window.loadCourts = async function() {
   var container = document.getElementById('courts-container');
   if (!container) return;
-  var search = document.getElementById('courts-search') ? document.getElementById('courts-search').value.toLowerCase() : '';
-  var city = document.getElementById('courts-city') ? document.getElementById('courts-city').value : '';
-  var state = document.getElementById('courts-state') ? document.getElementById('courts-state').value : '';
-  var type = document.getElementById('courts-type') ? document.getElementById('courts-type').value : '';
+  var search   = document.getElementById('courts-search')   ? document.getElementById('courts-search').value.toLowerCase()  : '';
+  var city     = document.getElementById('courts-city')     ? document.getElementById('courts-city').value    : '';
+  var state    = document.getElementById('courts-state')    ? document.getElementById('courts-state').value   : '';
+  var type     = document.getElementById('courts-type')     ? document.getElementById('courts-type').value    : '';
   var verified = document.getElementById('courts-verified') ? document.getElementById('courts-verified').value : '';
+
   var result = await window._supabase
     .from('Courts')
-    .select('"Court ID", "Court Name", "Address", "City", "State", "Zip Code", "Country", "Indoor or Outdoor", "Verified?"')
-    .order('"Court Name"', { ascending: true });
+    .select('court_id, court_name, address, city, state, zip_code, "Country", court_type, verified')
+    .order('court_name', { ascending: true });
+
   var data = result.data;
   var error = result.error;
   if (error) { console.error(error); return; }
   var allData = data;
+
   if (search) {
     data = data.filter(function(c) {
-      return (c['Court Name'] || '').toLowerCase().includes(search)
-        || (c['Address'] || '').toLowerCase().includes(search)
-        || (c['City'] || '').toLowerCase().includes(search);
+      return (c.court_name || '').toLowerCase().includes(search)
+        || (c.address     || '').toLowerCase().includes(search)
+        || (c.city        || '').toLowerCase().includes(search);
     });
   }
-  if (city) data = data.filter(function(c) { return c.City === city; });
-  if (state) data = data.filter(function(c) { return c.State === state; });
-  if (type) data = data.filter(function(c) { return c['Indoor or Outdoor'] === type; });
-  if (verified !== '') data = data.filter(function(c) { return c['Verified?'] === parseInt(verified); });
-  var cities = [...new Set(allData.map(function(c) { return c.City; }).filter(Boolean))].sort();
-  var states = [...new Set(allData.map(function(c) { return c.State; }).filter(Boolean))].sort();
-  var types = [...new Set(allData.map(function(c) { return c['Indoor or Outdoor']; }).filter(Boolean))].sort();
+  if (city)     data = data.filter(function(c) { return c.city       === city; });
+  if (state)    data = data.filter(function(c) { return c.state      === state; });
+  if (type)     data = data.filter(function(c) { return c.court_type === type; });
+  if (verified !== '') data = data.filter(function(c) { return c.verified === parseInt(verified); });
+
+  var cities = [...new Set(allData.map(function(c) { return c.city;       }).filter(Boolean))].sort();
+  var states = [...new Set(allData.map(function(c) { return c.state;      }).filter(Boolean))].sort();
+  var types  = [...new Set(allData.map(function(c) { return c.court_type; }).filter(Boolean))].sort();
+
   var rows = data.map(function(c) {
-    var verifiedBadge = c['Verified?'] === 1
+    var verifiedBadge = c.verified === 1
       ? '<span style="padding:2px 8px;background:#e6f4ea;color:#2d7a3a;border-radius:4px;font-size:11px;font-weight:500;">Verified</span>'
       : '<span style="padding:2px 8px;background:#f5f5f5;color:#888;border-radius:4px;font-size:11px;">Unverified</span>';
     return '<tr style="border-bottom:1px solid #f5f5f5;">'
-      + '<td style="padding:12px 8px;color:#111;font-weight:500;">' + (c['Court Name'] || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">' + (c['Address'] || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">' + (c['City'] || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">' + (c['State'] || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">' + (c['Zip Code'] || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">' + (c['Country'] || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">' + (c['Indoor or Outdoor'] || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;">' + verifiedBadge + '</td>'
+      + '<td style="padding:12px 8px;color:#111;font-weight:500;">' + (c.court_name || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + (c.address    || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + (c.city       || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + (c.state      || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + (c.zip_code   || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + (c.Country    || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + (c.court_type || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;">'                            + verifiedBadge           + '</td>'
       + '</tr>';
   }).join('');
-  var cityOptions = cities.map(function(c) {
-    return '<option value="' + c + '" ' + (c === city ? 'selected' : '') + '>' + c + '</option>';
-  }).join('');
-  var stateOptions = states.map(function(s) {
-    return '<option value="' + s + '" ' + (s === state ? 'selected' : '') + '>' + s + '</option>';
-  }).join('');
-  var typeOptions = types.map(function(t) {
-    return '<option value="' + t + '" ' + (t === type ? 'selected' : '') + '>' + t + '</option>';
-  }).join('');
+
+  var cityOptions  = cities.map(function(c) { return '<option value="'+c+'"'+(c===city  ?' selected':'')+'>'+c+'</option>'; }).join('');
+  var stateOptions = states.map(function(s) { return '<option value="'+s+'"'+(s===state ?' selected':'')+'>'+s+'</option>'; }).join('');
+  var typeOptions  = types.map(function(t)  { return '<option value="'+t+'"'+(t===type  ?' selected':'')+'>'+t+'</option>'; }).join('');
+
   container.innerHTML = ''
     + '<div style="padding:0 16px;">'
     + '<h2 style="font-size:22px;font-weight:500;margin-bottom:1.25rem;color:#111;">Court Directory</h2>'
     + '<div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap;">'
     + '<input id="courts-search" type="text" placeholder="Search courts..." value="' + search + '" oninput="loadCourts()" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;" />'
-    + '<select id="courts-city" onchange="loadCourts()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;"><option value="">City</option>' + cityOptions + '</select>'
-    + '<select id="courts-state" onchange="loadCourts()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;"><option value="">State</option>' + stateOptions + '</select>'
-    + '<select id="courts-type" onchange="loadCourts()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;"><option value="">Indoor/Outdoor</option>' + typeOptions + '</select>'
+    + '<select id="courts-city"     onchange="loadCourts()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;"><option value="">City</option>'          + cityOptions  + '</select>'
+    + '<select id="courts-state"    onchange="loadCourts()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;"><option value="">State</option>'         + stateOptions + '</select>'
+    + '<select id="courts-type"     onchange="loadCourts()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;"><option value="">Indoor/Outdoor</option>' + typeOptions  + '</select>'
     + '<select id="courts-verified" onchange="loadCourts()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;">'
     + '<option value="">All Courts</option>'
-    + '<option value="1" ' + (verified === '1' ? 'selected' : '') + '>Verified Only</option>'
-    + '<option value="0" ' + (verified === '0' ? 'selected' : '') + '>Unverified Only</option>'
+    + '<option value="1"' + (verified === '1' ? ' selected' : '') + '>Verified Only</option>'
+    + '<option value="0"' + (verified === '0' ? ' selected' : '') + '>Unverified Only</option>'
     + '</select>'
     + '</div>'
     + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;display:block;">'
@@ -1009,9 +1010,9 @@ window.loadVerifySessions = async function() {
 
   var mySessionsResult = await window._supabase
     .from('Sessions Forms')
-    .select('"Session ID", court_id, "Start Time", "End Time"')
+    .select('"Session ID", court_id, start_time, end_time')
     .eq('player_id', currentPlayerProfileNumber)
-    .not('"End Time"', 'is', null);
+    .not('end_time', 'is', null);
 
   var mySessions = mySessionsResult.data || [];
 
@@ -1038,36 +1039,36 @@ window.loadVerifySessions = async function() {
 
   var eligibleResult = await window._supabase
     .from('Sessions Forms')
-    .select('"Session ID", player_id, player_username, court_id, "Start Time", "End Time", "Images", "Verified? or Review?"')
+    .select('"Session ID", player_id, player_username, court_id, start_time, end_time, "Images", "Verified? or Review?"')
     .in('court_id', courtIds)
-    .not('"End Time"', 'is', null)
-    .gte('"End Time"', threeDaysAgo.toISOString())
+    .not('end_time', 'is', null)
+    .gte('end_time', threeDaysAgo.toISOString())
     .neq('player_id', currentPlayerProfileNumber)
-    .order('"Start Time"', { ascending: false });
+    .order('start_time', { ascending: false });
 
   var candidateSessions = eligibleResult.data || [];
 
   var eligibleSessions = candidateSessions.filter(function(theirSession) {
     if (alreadyVerifiedIds.indexOf(theirSession['Session ID']) !== -1) return false;
 
-    var theirStart = new Date(theirSession['Start Time']);
-    var theirEnd = new Date(theirSession['End Time']);
+    var theirStart = new Date(theirSession.start_time);
+    var theirEnd   = new Date(theirSession.end_time);
 
     return mySessions.some(function(mySession) {
       if (mySession.court_id !== theirSession.court_id) return false;
-      var myStart = new Date(mySession['Start Time']);
-      var myEnd = new Date(mySession['End Time']);
+      var myStart = new Date(mySession.start_time);
+      var myEnd   = new Date(mySession.end_time);
       return myStart < theirEnd && theirStart < myEnd;
     });
   });
 
   var courtsResult = await window._supabase
     .from('Courts')
-    .select('"Court ID", "Court Name"')
-    .in('"Court ID"', courtIds);
+    .select('court_id, court_name')
+    .in('court_id', courtIds);
 
   var courtMap = {};
-  (courtsResult.data || []).forEach(function(c) { courtMap[c['Court ID']] = c['Court Name']; });
+  (courtsResult.data || []).forEach(function(c) { courtMap[c.court_id] = c.court_name; });
 
   if (eligibleSessions.length === 0) {
     container.innerHTML = ''
@@ -1081,10 +1082,10 @@ window.loadVerifySessions = async function() {
   var cards = eligibleSessions.map(function(s) {
     var qualifyingSession = mySessions.find(function(mine) {
       if (mine.court_id !== s.court_id) return false;
-      var myStart = new Date(mine['Start Time']);
-      var myEnd = new Date(mine['End Time']);
-      var theirStart = new Date(s['Start Time']);
-      var theirEnd = new Date(s['End Time']);
+      var myStart    = new Date(mine.start_time);
+      var myEnd      = new Date(mine.end_time);
+      var theirStart = new Date(s.start_time);
+      var theirEnd   = new Date(s.end_time);
       return myStart < theirEnd && theirStart < myEnd;
     });
 
@@ -1098,7 +1099,7 @@ window.loadVerifySessions = async function() {
       + '<p style="font-size:15px;font-weight:500;color:#111;margin:0;">' + (s.player_username || 'Player ' + s.player_id) + '</p>'
       + '<span style="font-size:12px;color:#888;">' + courtName + '</span>'
       + '</div>'
-      + '<p style="font-size:12px;color:#888;margin:0 0 12px;">' + s['Start Time'] + ' — ' + s['End Time'] + '</p>'
+      + '<p style="font-size:12px;color:#888;margin:0 0 12px;">' + s.start_time + ' — ' + s.end_time + '</p>'
       + image
       + '<div style="display:flex;gap:8px;">'
       + '<button onclick="submitVerification(\'' + s['Session ID'] + '\', \'' + qualifyingSession['Session ID'] + '\', \'confirmed\')" style="flex:1;padding:10px 16px;background:#2d7a3a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">✓ Confirm</button>'
@@ -1197,15 +1198,15 @@ window.liveCourtFeedData = [];
 window.loadLiveCourtFeedData = async function() {
   var courtsResult = await window._supabase
     .from('Courts')
-    .select('"Court ID", "Court Name", "Address", "City", "State", "Country"')
-    .order('"Court Name"', { ascending: true });
+    .select('court_id, court_name, address, city, state, "Country"')
+    .order('court_name', { ascending: true });
 
   var courts = courtsResult.data || [];
 
   var activeSessionsResult = await window._supabase
     .from('Sessions Forms')
     .select('court_id')
-    .is('"End Time"', null);
+    .is('end_time', null);
 
   var activeSessions = activeSessionsResult.data || [];
 
@@ -1216,13 +1217,13 @@ window.loadLiveCourtFeedData = async function() {
 
   window.liveCourtFeedData = courts.map(function(c) {
     return {
-      courtId: c['Court ID'],
-      courtName: c['Court Name'],
-      address: c['Address'],
-      city: c['City'],
-      state: c['State'],
-      country: c['Country'],
-      activeCount: activeCounts[c['Court ID']] || 0
+      courtId:     c.court_id,
+      courtName:   c.court_name,
+      address:     c.address,
+      city:        c.city,
+      state:       c.state,
+      country:     c.Country,
+      activeCount: activeCounts[c.court_id] || 0
     };
   });
 

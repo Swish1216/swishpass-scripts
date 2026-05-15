@@ -3304,14 +3304,20 @@ window.resendConfirmation = async function () {
 };
 // ========================================
 // LEGACY SECTION — Player profile page
-// Reads player_profile_number from URL
-// Same pattern as sf-player and badges-earned sections
 // ========================================
 window.addEventListener('load', async function () {
   if (!document.getElementById('legacy-container')) return;
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const targetPlayerId = urlParams.get('player_profile_number');
+  var urlParams = new URLSearchParams(window.location.search);
+  var targetPlayerId = urlParams.get('player_profile_number');
+
+  // Fallback: viewing own profile — read from personal div
+  if (!targetPlayerId) {
+    var personalDiv = document.getElementById('personal-player-number');
+    if (personalDiv) {
+      targetPlayerId = (personalDiv.innerText || personalDiv.textContent || '').trim();
+    }
+  }
 
   if (!targetPlayerId) {
     document.getElementById('legacy-container').innerHTML =

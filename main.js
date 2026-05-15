@@ -3302,3 +3302,95 @@ window.resendConfirmation = async function () {
     }, 5000);
   }
 };
+// ========================================
+// PROFILE VIEW — loads any player's data
+// Replaces old Airtable script entirely
+// ========================================
+window.addEventListener('load', async function () {
+  if (!document.getElementById('player-username')) return;
+
+  var urlParams = new URLSearchParams(window.location.search);
+  var playerNumber = urlParams.get('player_profile_number');
+
+  if (!playerNumber) {
+    document.getElementById('player-username').textContent = 'No player specified.';
+    return;
+  }
+
+  var result = await window._supabase
+    .from('Players')
+    .select('"Username", "XP", "Tier", "State/Province", "Country", "Position", "Top Skill", "Favorite Player", "Profile Photo URL", "Badge Image URL", "Created", "MVP Count", "Session Totals", "Ranking", "Legacy Points"')
+    .eq('player_id', playerNumber)
+    .single();
+
+  if (result.error || !result.data) {
+    document.getElementById('player-username').textContent = 'Player not found.';
+    return;
+  }
+
+  var p = result.data;
+
+  // Core identity
+  var usernameEl = document.getElementById('player-username');
+  if (usernameEl) usernameEl.textContent = p.Username || 'Unknown';
+
+  var tierEl = document.getElementById('player-tier');
+  if (tierEl) tierEl.textContent = p.Tier || 'N/A';
+
+  var xpEl = document.getElementById('player-xp');
+  if (xpEl) xpEl.textContent = p.XP || 0;
+
+  var rankingEl = document.getElementById('player-ranking');
+  if (rankingEl) rankingEl.textContent = p.Ranking || 'N/A';
+
+  // Location
+  var countryEl = document.getElementById('player-country');
+  if (countryEl) countryEl.textContent = p.Country || 'N/A';
+
+  var cityEl = document.getElementById('player-city');
+  if (cityEl) cityEl.textContent = p['State/Province'] || 'N/A';
+
+  // Player details
+  var positionEl = document.getElementById('player-position');
+  if (positionEl) positionEl.textContent = p.Position || 'N/A';
+
+  var skillEl = document.getElementById('player-top-skill');
+  if (skillEl) skillEl.textContent = p['Top Skill'] || 'N/A';
+
+  var favEl = document.getElementById('player-favorite-player');
+  if (favEl) favEl.textContent = p['Favorite Player'] || 'N/A';
+
+  var createdEl = document.getElementById('player-created');
+  if (createdEl) createdEl.textContent = p.Created
+    ? new Date(p.Created).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    : 'N/A';
+
+  // Stats
+  var mvpEl = document.getElementById('player-mvp-count');
+  if (mvpEl) mvpEl.textContent = p['MVP Count'] || 0;
+
+  var sessionsEl = document.getElementById('player-session-totals');
+  if (sessionsEl) sessionsEl.textContent = p['Session Totals'] || 0;
+
+  var legacyEl = document.getElementById('player-legacy-points');
+  if (legacyEl) legacyEl.textContent = (p['Legacy Points'] || 0).toLocaleString();
+
+  // Photos
+  var photoEl = document.getElementById('player-profile-photo');
+  if (photoEl && p['Profile Photo URL']) photoEl.src = p['Profile Photo URL'];
+
+  var badgeEl = document.getElementById('player-badge-image');
+  if (badgeEl && p['Badge Image URL']) badgeEl.src = p['Badge Image URL'];
+
+  // Friend/report buttons — only show if viewing someone else's profile
+  var currentPlayer = await getCurrentPlayer();
+  var isSelf = currentPlayer.playerId && currentPlayer.playerId == playerNumber;
+
+  var reportBtn = document.getElementById('report-button');
+  var unfriendBtn = document.getElementById('unfriend-button');
+
+  if (isSelf) {
+    if (reportBtn) reportBtn.style.display = 'none';
+    if (unfriendBtn) unfriendBtn.style.display = 'none';
+  }
+});

@@ -3394,3 +3394,91 @@ window.addEventListener('load', async function () {
     if (unfriendBtn) unfriendBtn.style.display = 'none';
   }
 });
+// ========================================
+// PERSONAL PROFILE — /profile page
+// Loads logged-in player's own data
+// ========================================
+window.addEventListener('load', async function () {
+  if (window.location.pathname !== '/profile') return;
+
+  var player = await getCurrentPlayer();
+  if (!player || !player.playerId) return;
+
+  var result = await window._supabase
+    .from('Players')
+    .select('"Username", "XP", "Tier", "State/Province", "Country", "Position", "Top Skill", "Favorite Player", "Profile Photo URL", "Badge Image URL", "Created", "MVP Count", "Session Totals", "Ranking", "Legacy Points", "player_id"')
+    .eq('player_id', player.playerId)
+    .single();
+
+  if (result.error || !result.data) return;
+
+  var p = result.data;
+
+  // ── Populate personal-player-number first ──────────────────────────────
+  // This unlocks sf-player-container, badges-earned-player-container,
+  // legacy-container — all sections that depend on knowing the player ID
+  var playerNumEl = document.getElementById('personal-player-number');
+  if (playerNumEl) playerNumEl.textContent = p.player_id;
+
+  // ── Element ID fields ──────────────────────────────────────────────────
+  var usernameId = document.getElementById('username-ID');
+  if (usernameId) usernameId.textContent = '@' + (p.Username || 'Unknown');
+
+  var proPic = document.getElementById('player-pro-pic');
+  if (proPic && p['Profile Photo URL']) proPic.src = p['Profile Photo URL'];
+
+  var favorite = document.getElementById('favorite');
+  if (favorite) favorite.textContent = p['Favorite Player'] || 'N/A';
+
+  var createdDate = document.getElementById('member-created-date');
+  if (createdDate) createdDate.textContent = p.Created
+    ? new Date(p.Created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : 'N/A';
+
+  var xpEl = document.getElementById('player-xp');
+  if (xpEl) xpEl.textContent = (p.XP || 0).toLocaleString();
+
+  // ── data-user fields (backup in case autofillUser hasn't run yet) ──────
+  document.querySelectorAll('[data-user]').forEach(function(el) {
+    var key = el.getAttribute('data-user');
+    var value = null;
+
+    if (key === 'username')        value = p.Username;
+    if (key === 'tier')            value = p.Tier;
+    if (key === 'xp')              value = p.XP;
+    if (key === 'country')         value = p.Country;
+    if (key === 'state')           value = p['State/Province'];
+    if (key === 'position')        value = p.Position;
+    if (key === 'top-skill')       value = p['Top Skill'];
+    if (key === 'favorite-player') value = p['Favorite Player'];
+    if (key === 'created')         value = p.Created
+      ? new Date(p.Created).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+      : '';
+    if (key === 'player-id')       value = p.player_id;
+
+    if (value !== null) el.textContent = value;
+
+    if (key === 'photo' && p['Profile Photo URL']) {
+      el.src = p['Profile Photo URL'];
+    }
+  });
+
+  // ── Trigger dependent sections now that player ID is set ───────────────
+  // sf-player and badges-earned read from personal-player-number div
+  // Re-trigger them now that the div is populated
+  if (document.getElementById('sf-player-container')) {
+    sfPlayerTargetId = String(p.player_id);
+    sfPlayerPage = 0;
+    sfPlayerDone = false;
+    window.initSFPlayer();
+  }
+
+  if (document.getElementById('badges-earned-player-container')) {
+    badgesEarnedPlayerTargetId = String(p.player_id);
+    window.loadBadgesEarnedPlayer();
+  }
+
+  if (document.getElementById('legacy-container')) {
+    await loadLegacySection(p.player_id);
+  }
+});

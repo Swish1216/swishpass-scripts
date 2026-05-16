@@ -3205,6 +3205,48 @@ async function signOut() {
 }
 
 // ========================================
+// HEADER AUTH STATE — show/hide sign in/out + welcome msg
+// ========================================
+(function initHeaderAuth() {
+  // Hide both immediately to prevent flicker
+  var signInBtn  = document.getElementById('sign-in-btn');
+  var signOutBtn = document.getElementById('sign-out-btn');
+
+  if (signInBtn)  signInBtn.style.display  = 'none';
+  if (signOutBtn) signOutBtn.style.display = 'none';
+
+  window._supabase.auth.onAuthStateChange(async function(event, session) {
+    var signInBtn  = document.getElementById('sign-in-btn');
+    var signOutBtn = document.getElementById('sign-out-btn');
+    var welcomeEls = document.querySelectorAll('[data-user="welcome-msg"]');
+
+    if (session && session.user) {
+      // Signed in
+      if (signInBtn)  signInBtn.style.display  = 'none';
+      if (signOutBtn) signOutBtn.style.display = '';
+
+      // Fetch username for welcome message
+      var result = await window._supabase
+        .from('Players')
+        .select('"Username"')
+        .eq('auth_user_id', session.user.id)
+        .single();
+
+      var username = result.data ? result.data.Username : '';
+      welcomeEls.forEach(function(el) {
+        el.textContent = username ? 'Welcome, ' + username : '';
+      });
+
+    } else {
+      // Signed out
+      if (signInBtn)  signInBtn.style.display  = '';
+      if (signOutBtn) signOutBtn.style.display = 'none';
+      welcomeEls.forEach(function(el) { el.textContent = ''; });
+    }
+  });
+})();
+
+// ========================================
 // /confirm-email
 // ========================================
 window.addEventListener('load', async function () {

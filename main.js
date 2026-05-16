@@ -2017,7 +2017,7 @@ window.submitSignup = async function() {
       Country: country,
       'State/Province': state || null,
       XP: 0,
-      Tier: 'Rookie'
+Tier: 'Bronze'
     })
     .select();
 

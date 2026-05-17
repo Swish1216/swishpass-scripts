@@ -195,6 +195,10 @@ async function autofillUser() {
     });
   });
 
+  // Sidebar username
+  var sideUsername = document.getElementById('side-username');
+  if (sideUsername) sideUsername.textContent = player.Username || '';
+
   if (player["Profile Photo URL"]) {
     document.querySelectorAll('[data-user="photo"]').forEach(el => {
       el.src = player["Profile Photo URL"];

@@ -97,7 +97,7 @@ var authListener = window._supabase.auth.onAuthStateChange(function (event, sess
             const signOutBtn = document.getElementById('sign-out-btn');
             if (signOutBtn) signOutBtn.addEventListener('click', signOut);
 
-setTimeout(function() { autofillUser(); }, 1000);
+autofillUser();
           });
 
           // If DOMContentLoaded already fired, run immediately
@@ -114,7 +114,7 @@ setTimeout(function() { autofillUser(); }, 1000);
             const signOutBtn = document.getElementById('sign-out-btn');
             if (signOutBtn) signOutBtn.addEventListener('click', signOut);
 
-setTimeout(function() { autofillUser(); }, 1000);
+autofillUser();
           }
         });
 
@@ -152,6 +152,10 @@ async function getCurrentPlayer() {
 // ========================================
 async function autofillUser() {
   if (!window._supabase) return;
+  if (document.readyState !== 'complete') {
+    window.addEventListener('load', function() { autofillUser(); });
+    return;
+  }
 
   const { data: { session } } = await window._supabase.auth.getSession();
   if (!session) return;

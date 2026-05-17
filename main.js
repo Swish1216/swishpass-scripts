@@ -97,7 +97,11 @@ var authListener = window._supabase.auth.onAuthStateChange(function (event, sess
             const signOutBtn = document.getElementById('sign-out-btn');
             if (signOutBtn) signOutBtn.addEventListener('click', signOut);
 
-window.addEventListener('load', function() { autofillUser(); });
+if (document.readyState === 'complete') {
+  autofillUser();
+} else {
+  window.addEventListener('load', autofillUser);
+}
           });
 
           // If DOMContentLoaded already fired, run immediately
@@ -114,7 +118,11 @@ window.addEventListener('load', function() { autofillUser(); });
             const signOutBtn = document.getElementById('sign-out-btn');
             if (signOutBtn) signOutBtn.addEventListener('click', signOut);
 
-window.addEventListener('load', function() { autofillUser(); });
+if (document.readyState === 'complete') {
+  autofillUser();
+} else {
+  window.addEventListener('load', autofillUser);
+}
           }
         });
 

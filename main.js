@@ -47,13 +47,15 @@ const PUBLIC_PATHS = [
     window.location.href = "/sign-in";
   }, 3000);
 
-  var authListener = window._supabase.auth.onAuthStateChange(function (event, session) {
-    if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-      if (!session) {
-        clearTimeout(authTimeout);
-        window.location.href = "/sign-in";
-        return;
-      }
+var authListener = window._supabase.auth.onAuthStateChange(function (event, session) {
+  if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+    if (!session) {
+      clearTimeout(authTimeout);
+      window.location.href = "/sign-in";
+      return;
+    }
+
+    updateHeaderAuthUI(session);  // ← NEW LINE ADDED HERE
 
       // Gate unconfirmed users
       if (!session.user.email_confirmed_at) {
@@ -116,8 +118,9 @@ const PUBLIC_PATHS = [
           }
         });
 
-    } else if (event === 'SIGNED_OUT') {
+} else if (event === 'SIGNED_OUT') {
       clearTimeout(authTimeout);
+      updateHeaderAuthUI(null);  // ← ADD THIS LINE
       window.location.href = "/sign-in";
     }
   });
@@ -3638,3 +3641,26 @@ window.loadLegacySection = async function (targetPlayerId) {
     + '</div>'
     + '</div>';
 };
+// ========================================
+// HEADER AUTH UI
+// ========================================
+function updateHeaderAuthUI(session) {
+  var signInBtn  = document.getElementById('sign-in-btn');
+  var signOutBtn = document.getElementById('sign-out-btn');
+  var welcomeMsg = document.getElementById('welcome-msg');
+
+  if (session) {
+    if (signInBtn)  signInBtn.style.display  = 'none';
+    if (signOutBtn) signOutBtn.style.display = 'block';
+    if (welcomeMsg) welcomeMsg.style.display = 'block';
+  } else {
+    if (signInBtn)  signInBtn.style.display  = 'block';
+    if (signOutBtn) signOutBtn.style.display = 'none';
+    if (welcomeMsg) welcomeMsg.style.display = 'none';
+  }
+}
+
+// Run on every page load to set initial header state
+window._supabase.auth.getSession().then(function(result) {
+  updateHeaderAuthUI(result.data.session);
+});

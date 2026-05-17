@@ -204,8 +204,7 @@ async function autofillUser() {
   });
 
   // Sidebar username
-  var sideUsername = document.getElementById('side-username');
-  if (sideUsername) sideUsername.textContent = player.Username || '';
+updateSidebarUI(player);
 
   if (player["Profile Photo URL"]) {
     document.querySelectorAll('[data-user="photo"]').forEach(el => {
@@ -3701,3 +3700,25 @@ welcomeMsg.style.fontFamily = 'inherit';
 window._supabase.auth.getSession().then(function(result) {
   updateHeaderAuthUI(result.data.session);
 });
+// ========================================
+// SIDEBAR + HOME STATS INJECTION
+// ========================================
+function updateSidebarUI(player) {
+  var sidebar = document.getElementById('profile-info');
+  if (sidebar) {
+    sidebar.innerHTML = ''
+      + '<img src="' + (player['Profile Photo URL'] || '') + '" style="width:56px;height:56px;border-radius:50%;object-fit:cover;display:block;margin-bottom:10px;" />'
+      + '<p style="font-size:15px;font-weight:600;color:#111;margin:0;">@' + (player.Username || '') + '</p>';
+  }
+
+  // Only inject stats on /sp-home
+  if (window.location.pathname === '/sp-home') {
+    var tierEl    = document.getElementById('tier');
+    var rankingEl = document.getElementById('ranking');
+    var xpEl      = document.getElementById('XP');
+
+    if (tierEl)    tierEl.textContent    = player.Tier    || 'N/A';
+    if (rankingEl) rankingEl.textContent = player.Ranking || 'N/A';
+    if (xpEl)      xpEl.textContent      = player.XP      || 0;
+  }
+}

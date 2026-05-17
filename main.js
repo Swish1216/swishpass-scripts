@@ -3663,7 +3663,7 @@ function updateHeaderAuthUI(session) {
           .single()
           .then(function(result) {
             if (result.data && result.data.Username) {
-welcomeMsg.innerHTML = 'Welcome, <span style="color: #1b4ea3;">' + result.data.Username + '</span>';
+welcomeMsg.innerHTML = 'Welcome, <span style="color: #0060ff;">' + result.data.Username + '</span>';
 welcomeMsg.style.display = 'block';
 welcomeMsg.style.fontSize = '48px';
 welcomeMsg.style.fontWeight = '700';

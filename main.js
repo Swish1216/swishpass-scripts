@@ -3650,17 +3650,36 @@ function updateHeaderAuthUI(session) {
   var welcomeMsg = document.getElementById('welcome-msg');
 
   if (session) {
-    if (signInBtn)  signInBtn.style.display  = 'none';
+    if (signInBtn)  signInBtn.style.display = 'none';
     if (signOutBtn) signOutBtn.style.display = 'block';
-    if (welcomeMsg) welcomeMsg.style.display = 'block';
+
+    // Welcome message — only on /sp-home
+    if (welcomeMsg) {
+      if (window.location.pathname === '/sp-home') {
+        window._supabase
+          .from('Players')
+          .select('"Username"')
+          .eq('auth_user_id', session.user.id)
+          .single()
+          .then(function(result) {
+            if (result.data && result.data.Username) {
+              welcomeMsg.textContent = 'Welcome, ' + result.data.Username + '!';
+              welcomeMsg.style.display = 'block';
+            }
+          });
+      } else {
+        welcomeMsg.style.display = 'none';
+      }
+    }
+
   } else {
-    if (signInBtn)  signInBtn.style.display  = 'block';
+    if (signInBtn)  signInBtn.style.display = 'block';
     if (signOutBtn) signOutBtn.style.display = 'none';
     if (welcomeMsg) welcomeMsg.style.display = 'none';
   }
 }
 
-// Run on every page load to set initial header state
+// Set header state on every page load
 window._supabase.auth.getSession().then(function(result) {
   updateHeaderAuthUI(result.data.session);
 });

@@ -3663,8 +3663,14 @@ function updateHeaderAuthUI(session) {
           .single()
           .then(function(result) {
             if (result.data && result.data.Username) {
-              welcomeMsg.textContent = 'Welcome, ' + result.data.Username + '!';
-              welcomeMsg.style.display = 'block';
+welcomeMsg.innerHTML = 'Welcome, <span style="color: #378add;">' + result.data.Username + '</span>';
+welcomeMsg.style.display = 'block';
+welcomeMsg.style.fontSize = '48px';
+welcomeMsg.style.fontWeight = '700';
+welcomeMsg.style.color = '#111';
+welcomeMsg.style.letterSpacing = '-1px';
+welcomeMsg.style.lineHeight = '1.1';
+welcomeMsg.style.fontFamily = 'inherit';
             }
           });
       } else {

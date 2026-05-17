@@ -97,7 +97,7 @@ var authListener = window._supabase.auth.onAuthStateChange(function (event, sess
             const signOutBtn = document.getElementById('sign-out-btn');
             if (signOutBtn) signOutBtn.addEventListener('click', signOut);
 
-setTimeout(function() { autofillUser(); }, 500);
+setTimeout(function() { autofillUser(); }, 1000);
           });
 
           // If DOMContentLoaded already fired, run immediately
@@ -114,7 +114,7 @@ setTimeout(function() { autofillUser(); }, 500);
             const signOutBtn = document.getElementById('sign-out-btn');
             if (signOutBtn) signOutBtn.addEventListener('click', signOut);
 
-setTimeout(function() { autofillUser(); }, 500);
+setTimeout(function() { autofillUser(); }, 1000);
           }
         });
 

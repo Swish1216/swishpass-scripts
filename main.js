@@ -3699,6 +3699,9 @@ welcomeMsg.style.fontFamily = 'inherit';
 // Set header state on every page load
 window._supabase.auth.getSession().then(function(result) {
   updateHeaderAuthUI(result.data.session);
+  if (result.data.session) {
+    setTimeout(function() { autofillUser(); }, 800);
+  }
 });
 // ========================================
 // SIDEBAR + HOME STATS INJECTION

@@ -3725,3 +3725,404 @@ function updateSidebarUI(player) {
     if (xpEl)      xpEl.textContent      = player.XP      || 0;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROOF OF PLAY — Add a Court
+// Targets a Div Block with ID: court-submit-root
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SUPABASE_URL  = 'https://wscsrjaylotmcabdwvde.supabase.co';
+const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY'; // ← replace before deploying
+const BYTESCALE_ACCT = 'G22nhnC';
+const BYTESCALE_KEY  = 'Bearer public_G22nhnC83CH88avhAZxjkQq4tdkn';
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let selectedType = '';
+
+// ── Auth token (reads Supabase session from localStorage) ────────────────────
+function getToken() {
+  try {
+    const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    if (!key) return SUPABASE_ANON;
+    const data = JSON.parse(localStorage.getItem(key));
+    return data?.access_token || SUPABASE_ANON;
+  } catch { return SUPABASE_ANON; }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function val(id)  { return document.getElementById(id)?.value.trim() ?? ''; }
+
+function setError(fieldId, msg) {
+  document.getElementById('pop-field-' + fieldId)?.classList.add('invalid');
+  const err = document.getElementById('pop-err-' + fieldId);
+  if (err) { err.textContent = '⚠ ' + msg; err.classList.add('visible'); }
+}
+function clearError(fieldId) {
+  document.getElementById('pop-field-' + fieldId)?.classList.remove('invalid');
+  document.getElementById('pop-err-' + fieldId)?.classList.remove('visible');
+}
+function clearAllErrors() {
+  document.querySelectorAll('.pop-field').forEach(f => f.classList.remove('invalid'));
+  document.querySelectorAll('.pop-field-error').forEach(e => e.classList.remove('visible'));
+}
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('pop-toast');
+  if (!t) return;
+  t.textContent = (type === 'success' ? '✓  ' : '✕  ') + msg;
+  t.className = `pop-toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+function validate() {
+  clearAllErrors();
+  let ok = true;
+  if (!val('pop-court-name'))  { setError('court-name', 'Court name is required'); ok = false; }
+  if (!selectedType)           { setError('court-type', 'Please select a facility type'); ok = false; }
+  if (!val('pop-city'))        { setError('city', 'City is required'); ok = false; }
+  if (!val('pop-state'))       { setError('state', 'State is required'); ok = false; }
+  if (!val('pop-country'))     { setError('country', 'Country is required'); ok = false; }
+  const lat = parseFloat(val('pop-latitude'));
+  const lng = parseFloat(val('pop-longitude'));
+  if (!val('pop-latitude')  || isNaN(lat) || lat < -90  || lat > 90)  { setError('latitude',  'Valid latitude required (−90 to 90)'); ok = false; }
+  if (!val('pop-longitude') || isNaN(lng) || lng < -180 || lng > 180) { setError('longitude', 'Valid longitude required (−180 to 180)'); ok = false; }
+  return ok;
+}
+
+// ── Photo preview ─────────────────────────────────────────────────────────────
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { showToast('Photo must be under 10MB', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const preview = document.getElementById('pop-photo-preview');
+    preview.src = e.target.result;
+    preview.classList.add('visible');
+    document.getElementById('pop-photo-drop-content').style.display = 'none';
+    document.getElementById('pop-photo-change').style.display = 'block';
+    document.getElementById('pop-photo-drop').classList.add('has-file');
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Bytescale upload ──────────────────────────────────────────────────────────
+async function uploadToBytescale(file) {
+  const buf      = await file.arrayBuffer();
+  const filename = `court_${Date.now()}.jpg`;
+  const res = await fetch(
+    `https://api.bytescale.com/v2/accounts/${BYTESCALE_ACCT}/uploads/binary`,
+    {
+      method:  'POST',
+      headers: {
+        'Authorization':        BYTESCALE_KEY,
+        'Content-Type':         file.type || 'image/jpeg',
+        'X-Bytescale-Filename': filename,
+      },
+      body: buf,
+    }
+  );
+  if (!res.ok) throw new Error('Photo upload failed');
+  const data = await res.json();
+  return `https://upcdn.io/${BYTESCALE_ACCT}/raw${data.filePath}`;
+}
+
+// ── Reset form ────────────────────────────────────────────────────────────────
+function resetCourtForm() {
+  document.getElementById('pop-court-form')?.reset();
+  document.getElementById('pop-court-form').style.display = '';
+  document.getElementById('pop-success').classList.remove('show');
+  document.querySelectorAll('.pop-toggle-btn').forEach(b => b.classList.remove('active'));
+  selectedType = '';
+  clearAllErrors();
+  const preview = document.getElementById('pop-photo-preview');
+  preview.src = ''; preview.classList.remove('visible');
+  document.getElementById('pop-photo-drop-content').style.display = '';
+  document.getElementById('pop-photo-change').style.display = 'none';
+  document.getElementById('pop-photo-drop').classList.remove('has-file');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────────
+async function handleCourtSubmit(e) {
+  e.preventDefault();
+  if (!validate()) return;
+
+  const btn = document.getElementById('pop-submit-btn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+
+  try {
+    // 1. Resolve logged-in player_id
+    let addedBy = null;
+    try {
+      const token = getToken();
+      const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${token}` }
+      });
+      const userData = await userRes.json();
+      if (userData?.id) {
+        const playerRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/Players?auth_user_id=eq.${userData.id}&select=player_id&limit=1`,
+          { headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${token}` } }
+        );
+        const players = await playerRes.json();
+        addedBy = players?.[0]?.player_id ?? null;
+      }
+    } catch { /* non-fatal — addedBy stays null */ }
+
+    // 2. Upload photo if a file was selected
+    let photoUrl = val('pop-photo-url') || null;
+    const fileInput = document.getElementById('pop-photo-file');
+    if (fileInput.files.length > 0 && !photoUrl) {
+      try { photoUrl = await uploadToBytescale(fileInput.files[0]); }
+      catch { showToast('Photo upload failed — court will be submitted without it', 'error'); }
+    }
+
+    // 3. Build payload
+    const has_indoor  = selectedType === 'Indoor'  || selectedType === 'Both';
+    const has_outdoor = selectedType === 'Outdoor' || selectedType === 'Both';
+
+    const payload = {
+      court_name:   val('pop-court-name'),
+      court_type:   selectedType,
+      latitude:     parseFloat(val('pop-latitude')),
+      longitude:    parseFloat(val('pop-longitude')),
+      city:         val('pop-city'),
+      state:        val('pop-state'),
+      Country:      val('pop-country'),
+      verified:     0,
+      has_indoor,
+      has_outdoor,
+    };
+    if (val('pop-address'))   payload.address          = val('pop-address');
+    if (val('pop-zip'))       payload.zip_code         = val('pop-zip');
+    if (photoUrl)             payload['Court Photo']   = photoUrl;
+    if (addedBy)              payload.added_by         = addedBy;
+
+    // 4. Insert into Supabase
+    const token = getToken();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/Courts`, {
+      method:  'POST',
+      headers: {
+        'apikey':        SUPABASE_ANON,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.message || `Insert failed (${res.status})`);
+    }
+
+    // 5. Show success
+    document.getElementById('pop-court-form').style.display = 'none';
+    document.getElementById('pop-success').classList.add('show');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch (err) {
+    console.error('[SubmitCourt]', err);
+    showToast(err.message || 'Submission failed — please try again', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+// ── Build & inject HTML into #court-submit-root ───────────────────────────────
+function initCourtSubmit() {
+  const root = document.getElementById('court-submit-root');
+  if (!root) return;
+
+  root.innerHTML = `
+    <div class="pop-wrap">
+
+      <!-- Header -->
+      <p class="pop-eyebrow">🏀 Proof of Play</p>
+      <h1 class="pop-title">Add a<br><span>Court</span></h1>
+      <p class="pop-subtitle">
+        Know a court worth playing on? Add it to the database — no photo required.
+        Courts go live immediately and earn you a badge once verified by our team.
+      </p>
+
+      <!-- Success state -->
+      <div class="pop-success" id="pop-success">
+        <div class="pop-success-icon">🏀</div>
+        <div class="pop-success-title">Court Added!</div>
+        <div class="pop-success-body">
+          The court is now live in the database. You'll earn a badge once our team verifies your submission.
+        </div>
+        <button class="pop-success-again" onclick="resetCourtForm()">Add Another Court</button>
+      </div>
+
+      <!-- Form -->
+      <form class="pop-form" id="pop-court-form" novalidate>
+
+        <p class="pop-section">Court Info</p>
+
+        <!-- Court name -->
+        <div class="pop-field" id="pop-field-court-name">
+          <label class="pop-label" for="pop-court-name">
+            Court Name <span class="pop-req">*</span>
+          </label>
+          <input type="text" id="pop-court-name" placeholder="e.g. Wicker Park Full Court" maxlength="80" autocomplete="off" />
+          <span class="pop-field-error" id="pop-err-court-name"></span>
+        </div>
+
+        <!-- Facility type -->
+        <div class="pop-field" id="pop-field-court-type">
+          <label class="pop-label">Facilities <span class="pop-req">*</span></label>
+          <p class="pop-hint">Select all that apply at this location</p>
+          <div class="pop-toggle-row">
+            <button type="button" class="pop-toggle-btn" data-value="Outdoor">
+              <span class="pop-toggle-icon">☀️</span> Outdoor
+            </button>
+            <button type="button" class="pop-toggle-btn" data-value="Indoor">
+              <span class="pop-toggle-icon">🏢</span> Indoor
+            </button>
+            <button type="button" class="pop-toggle-btn" data-value="Both">
+              <span class="pop-toggle-icon">🏀</span> Both
+            </button>
+          </div>
+          <span class="pop-field-error" id="pop-err-court-type"></span>
+        </div>
+
+        <p class="pop-section">Location</p>
+
+        <!-- Address -->
+        <div class="pop-field">
+          <label class="pop-label" for="pop-address">
+            Address <span class="pop-opt">(optional)</span>
+          </label>
+          <input type="text" id="pop-address" placeholder="e.g. 3700 N Recreation Dr" />
+        </div>
+
+        <!-- City / State / Zip -->
+        <div class="pop-row-csz">
+          <div class="pop-field" id="pop-field-city">
+            <label class="pop-label" for="pop-city">City <span class="pop-req">*</span></label>
+            <input type="text" id="pop-city" placeholder="Chicago" />
+            <span class="pop-field-error" id="pop-err-city"></span>
+          </div>
+          <div class="pop-field" id="pop-field-state">
+            <label class="pop-label" for="pop-state">State <span class="pop-req">*</span></label>
+            <input type="text" id="pop-state" placeholder="IL" maxlength="50" />
+            <span class="pop-field-error" id="pop-err-state"></span>
+          </div>
+          <div class="pop-field">
+            <label class="pop-label" for="pop-zip">Zip <span class="pop-opt">(opt)</span></label>
+            <input type="text" id="pop-zip" placeholder="60612" maxlength="10" />
+          </div>
+        </div>
+
+        <!-- Country -->
+        <div class="pop-field" id="pop-field-country">
+          <label class="pop-label" for="pop-country">Country <span class="pop-req">*</span></label>
+          <input type="text" id="pop-country" placeholder="United States" value="United States" />
+          <span class="pop-field-error" id="pop-err-country"></span>
+        </div>
+
+        <p class="pop-section">GPS Coordinates</p>
+
+        <div class="pop-coords-box">
+          <p class="pop-coords-note">
+            Find the court on <a href="https://maps.google.com" target="_blank">Google Maps</a>,
+            right-click the exact spot, and copy the coordinates at the top of the menu.
+            Latitude first, then longitude (negative for US locations).
+          </p>
+          <div class="pop-row-2">
+            <div class="pop-field" id="pop-field-latitude">
+              <label class="pop-label" for="pop-latitude">Latitude <span class="pop-req">*</span></label>
+              <input type="number" id="pop-latitude" placeholder="41.9562" step="0.0001" min="-90" max="90" />
+              <span class="pop-field-error" id="pop-err-latitude"></span>
+            </div>
+            <div class="pop-field" id="pop-field-longitude">
+              <label class="pop-label" for="pop-longitude">Longitude <span class="pop-req">*</span></label>
+              <input type="number" id="pop-longitude" placeholder="-87.6383" step="0.0001" min="-180" max="180" />
+              <span class="pop-field-error" id="pop-err-longitude"></span>
+            </div>
+          </div>
+        </div>
+
+        <p class="pop-section">Court Photo</p>
+
+        <div class="pop-field">
+          <label class="pop-label">Photo <span class="pop-opt">(optional)</span></label>
+          <div class="pop-photo-drop" id="pop-photo-drop">
+            <input type="file" id="pop-photo-file" accept="image/*" />
+            <div id="pop-photo-drop-content">
+              <div class="pop-photo-icon">📸</div>
+              <div class="pop-photo-text">
+                <strong>Click to upload</strong> or drag & drop<br>JPG, PNG, WEBP up to 10MB
+              </div>
+            </div>
+            <img class="pop-photo-preview" id="pop-photo-preview" alt="Court preview" />
+            <div class="pop-photo-change" id="pop-photo-change" style="display:none">Tap to change photo</div>
+          </div>
+          <p class="pop-hint" style="margin-top:6px">Or paste a photo URL instead:</p>
+          <input type="text" id="pop-photo-url" placeholder="https://example.com/court-photo.jpg" />
+        </div>
+
+        <div class="pop-divider" style="margin:8px 0"></div>
+
+        <button type="submit" class="pop-submit-btn" id="pop-submit-btn">
+          <span class="pop-btn-text">Submit Court</span>
+          <div class="pop-spinner"></div>
+        </button>
+
+        <p class="pop-disclaimer">
+          Courts go live immediately with verified = 0.
+          You'll earn a badge once our team approves the submission.
+        </p>
+
+      </form>
+
+      <div class="pop-toast" id="pop-toast"></div>
+    </div>
+  `;
+
+  // ── Wire up events ──────────────────────────────────────────────────────────
+
+  // Facility toggles
+  document.querySelectorAll('.pop-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.pop-toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedType = btn.dataset.value;
+      clearError('court-type');
+    });
+  });
+
+  // Photo file input
+  document.getElementById('pop-photo-file').addEventListener('change', function() {
+    handleFileSelect(this);
+  });
+
+  // Drag & drop
+  const drop = document.getElementById('pop-photo-drop');
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.style.borderColor = '#0060ff'; });
+  drop.addEventListener('dragleave', () => { drop.style.borderColor = ''; });
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.style.borderColor = '';
+    const file = e.dataTransfer.files[0];
+    if (file?.type.startsWith('image/')) {
+      const dt = new DataTransfer(); dt.items.add(file);
+      const input = document.getElementById('pop-photo-file');
+      input.files = dt.files;
+      handleFileSelect(input);
+    }
+  });
+
+  // Form submit
+  document.getElementById('pop-court-form').addEventListener('submit', handleCourtSubmit);
+}
+
+// ── Run on DOM ready ──────────────────────────────────────────────────────────
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initCourtSubmit);
+} else {
+  initCourtSubmit();
+}

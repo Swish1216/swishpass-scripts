@@ -3934,6 +3934,14 @@ async function handleCourtSubmit(e) {
 
 // ── Build & inject HTML into #court-submit-root ───────────────────────────────
 function initCourtSubmit() {
+  // Inject Google Fonts if not already loaded
+  if (!document.querySelector('link[href*="Bebas+Neue"]')) {
+    const link = document.createElement('link');
+    link.href = 'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+  }
+
   const root = document.getElementById('court-submit-root');
   if (!root) return;
 

@@ -3725,3 +3725,448 @@ function updateSidebarUI(player) {
     if (xpEl)      xpEl.textContent      = player.XP      || 0;
   }
 }
+// ─────────────────────────────────────────────────────────────────────────────
+// PROOF OF PLAY — Add a Court
+// Paste at the bottom of main.js
+// Div Block on Webflow page must have ID: court-submit-root
+// Uses window._supabase already initialized in Webflow head code
+// ─────────────────────────────────────────────────────────────────────────────
+
+(function () {
+
+  var CS_BYTESCALE_ACCT = 'G22nhnC';
+  var CS_BYTESCALE_KEY  = 'Bearer public_G22nhnC83CH88avhAZxjkQq4tdkn';
+  var cs_selectedType   = '';
+
+  // ── Field value helper ──────────────────────────────────────────────────────
+  function cs_val(id) {
+    var el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+  }
+
+  // ── Validation ──────────────────────────────────────────────────────────────
+  function cs_setError(fieldId, msg) {
+    var field = document.getElementById('cs-field-' + fieldId);
+    if (field) field.classList.add('cs-invalid');
+    var err = document.getElementById('cs-err-' + fieldId);
+    if (err) { err.textContent = '⚠ ' + msg; err.style.display = 'flex'; }
+  }
+  function cs_clearAllErrors() {
+    document.querySelectorAll('.cs-field').forEach(function(f) { f.classList.remove('cs-invalid'); });
+    document.querySelectorAll('.cs-err').forEach(function(e) { e.style.display = 'none'; });
+  }
+  function cs_validate() {
+    cs_clearAllErrors();
+    var ok = true;
+    if (!cs_val('cs-court-name')) { cs_setError('court-name', 'Court name is required'); ok = false; }
+    if (!cs_selectedType)         { cs_setError('court-type', 'Please select a facility type'); ok = false; }
+    if (!cs_val('cs-city'))       { cs_setError('city', 'City is required'); ok = false; }
+    if (!cs_val('cs-state'))      { cs_setError('state', 'State is required'); ok = false; }
+    if (!cs_val('cs-country'))    { cs_setError('country', 'Country is required'); ok = false; }
+    var lat = parseFloat(cs_val('cs-latitude'));
+    var lng = parseFloat(cs_val('cs-longitude'));
+    if (!cs_val('cs-latitude')  || isNaN(lat) || lat < -90  || lat > 90)  { cs_setError('latitude',  'Valid latitude required (−90 to 90)'); ok = false; }
+    if (!cs_val('cs-longitude') || isNaN(lng) || lng < -180 || lng > 180) { cs_setError('longitude', 'Valid longitude required (−180 to 180)'); ok = false; }
+    return ok;
+  }
+
+  // ── Toast ───────────────────────────────────────────────────────────────────
+  function cs_showToast(msg, type) {
+    var t = document.getElementById('cs-toast');
+    if (!t) return;
+    t.textContent = (type === 'error' ? '✕  ' : '✓  ') + msg;
+    t.className = 'cs-toast cs-toast-' + (type || 'success') + ' cs-toast-show';
+    setTimeout(function() { t.className = 'cs-toast'; }, 4000);
+  }
+
+  // ── Photo preview ───────────────────────────────────────────────────────────
+  function cs_handleFileSelect(input) {
+    var file = input.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { cs_showToast('Photo must be under 10MB', 'error'); return; }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var preview = document.getElementById('cs-photo-preview');
+      if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
+      var content = document.getElementById('cs-photo-content');
+      if (content) content.style.display = 'none';
+      var change = document.getElementById('cs-photo-change');
+      if (change) change.style.display = 'block';
+      var drop = document.getElementById('cs-photo-drop');
+      if (drop) { drop.style.padding = '0'; drop.style.borderStyle = 'solid'; drop.style.borderColor = '#0060ff'; }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ── Bytescale upload ────────────────────────────────────────────────────────
+  async function cs_uploadPhoto(file) {
+    var buf = await file.arrayBuffer();
+    var res = await fetch(
+      'https://api.bytescale.com/v2/accounts/' + CS_BYTESCALE_ACCT + '/uploads/binary',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': CS_BYTESCALE_KEY,
+          'Content-Type': file.type || 'image/jpeg',
+          'X-Bytescale-Filename': 'court_' + Date.now() + '.jpg'
+        },
+        body: buf
+      }
+    );
+    if (!res.ok) throw new Error('Photo upload failed');
+    var data = await res.json();
+    return 'https://upcdn.io/' + CS_BYTESCALE_ACCT + '/raw' + data.filePath;
+  }
+
+  // ── Reset ───────────────────────────────────────────────────────────────────
+  window.resetCourtForm = function() {
+    var form = document.getElementById('cs-form');
+    if (form) { form.reset(); form.style.display = ''; }
+    var success = document.getElementById('cs-success');
+    if (success) success.style.display = 'none';
+    document.querySelectorAll('.cs-toggle-btn').forEach(function(b) { b.classList.remove('cs-active'); });
+    cs_selectedType = '';
+    cs_clearAllErrors();
+    var preview = document.getElementById('cs-photo-preview');
+    if (preview) { preview.src = ''; preview.style.display = 'none'; }
+    var content = document.getElementById('cs-photo-content');
+    if (content) content.style.display = '';
+    var change = document.getElementById('cs-photo-change');
+    if (change) change.style.display = 'none';
+    var drop = document.getElementById('cs-photo-drop');
+    if (drop) { drop.style.padding = ''; drop.style.borderStyle = ''; drop.style.borderColor = ''; }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // ── Submit ──────────────────────────────────────────────────────────────────
+  async function cs_handleSubmit(e) {
+    e.preventDefault();
+    if (!cs_validate()) return;
+
+    var btn     = document.getElementById('cs-submit-btn');
+    var btnText = document.getElementById('cs-btn-text');
+    var spinner = document.getElementById('cs-spinner');
+    btn.disabled = true;
+    if (btnText) btnText.style.display = 'none';
+    if (spinner) spinner.style.display = 'block';
+
+    try {
+      // 1. Get logged-in player_id via window._supabase
+      var addedBy = null;
+      try {
+        var sessionResult = await window._supabase.auth.getSession();
+        var session = sessionResult.data.session;
+        if (session && session.user) {
+          var playerResult = await window._supabase
+            .from('Players')
+            .select('player_id')
+            .eq('auth_user_id', session.user.id)
+            .limit(1);
+          if (playerResult.data && playerResult.data.length > 0) {
+            addedBy = playerResult.data[0].player_id;
+          }
+        }
+      } catch(authErr) { /* non-fatal */ }
+
+      // 2. Upload photo if file selected
+      var photoUrl = cs_val('cs-photo-url') || null;
+      var fileInput = document.getElementById('cs-photo-file');
+      if (fileInput && fileInput.files.length > 0 && !photoUrl) {
+        try { photoUrl = await cs_uploadPhoto(fileInput.files[0]); }
+        catch(e) { cs_showToast('Photo upload failed — submitting without it', 'error'); }
+      }
+
+      // 3. Build payload
+      var has_indoor  = cs_selectedType === 'Indoor'  || cs_selectedType === 'Both';
+      var has_outdoor = cs_selectedType === 'Outdoor' || cs_selectedType === 'Both';
+
+      var payload = {
+        court_name:   cs_val('cs-court-name'),
+        court_type:   cs_selectedType,
+        latitude:     parseFloat(cs_val('cs-latitude')),
+        longitude:    parseFloat(cs_val('cs-longitude')),
+        city:         cs_val('cs-city'),
+        state:        cs_val('cs-state'),
+        Country:      cs_val('cs-country'),
+        verified:     0,
+        has_indoor:   has_indoor,
+        has_outdoor:  has_outdoor
+      };
+      if (cs_val('cs-address'))   payload.address          = cs_val('cs-address');
+      if (cs_val('cs-zip'))       payload.zip_code         = cs_val('cs-zip');
+      if (photoUrl)               payload['Court Photo']   = photoUrl;
+      if (addedBy)                payload.added_by         = addedBy;
+
+      // 4. Insert via window._supabase
+      var insertResult = await window._supabase
+        .from('Courts')
+        .insert(payload);
+
+      if (insertResult.error) throw new Error(insertResult.error.message);
+
+      // 5. Success
+      var form = document.getElementById('cs-form');
+      if (form) form.style.display = 'none';
+      var success = document.getElementById('cs-success');
+      if (success) success.style.display = 'flex';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    } catch(err) {
+      console.error('[SubmitCourt]', err);
+      cs_showToast(err.message || 'Submission failed — please try again', 'error');
+    } finally {
+      btn.disabled = false;
+      if (btnText) btnText.style.display = '';
+      if (spinner) spinner.style.display = 'none';
+    }
+  }
+
+  // ── Inject CSS ──────────────────────────────────────────────────────────────
+  function cs_injectStyles() {
+    if (document.getElementById('cs-styles')) return;
+    var style = document.createElement('style');
+    style.id = 'cs-styles';
+    style.textContent = [
+      '#court-submit-root { font-family: "DM Sans", sans-serif; font-size: 15px; line-height: 1.5; color: #080f24; max-width: 640px; margin: 0 auto; padding: 40px 0 80px; }',
+      '#court-submit-root * { box-sizing: border-box; }',
+      '.cs-eyebrow { font-family: "DM Mono", monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: #0060ff; margin-bottom: 10px; }',
+      '.cs-title { font-family: "Bebas Neue", sans-serif; font-size: clamp(56px, 10vw, 80px); line-height: 0.92; letter-spacing: 0.02em; color: #080f24; margin-bottom: 16px; }',
+      '.cs-title span { color: #0060ff; }',
+      '.cs-subtitle { color: #7a87ab; font-size: 14px; line-height: 1.65; max-width: 480px; margin-bottom: 36px; }',
+      '.cs-divider { height: 1px; background: linear-gradient(90deg, #0060ff 0%, #dde3f5 50%, transparent 100%); margin: 28px 0; }',
+      '.cs-section { font-family: "DM Mono", monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: #7a87ab; margin: 8px 0 18px; display: flex; align-items: center; gap: 10px; }',
+      '.cs-section::after { content: ""; flex: 1; height: 1px; background: #dde3f5; }',
+      '.cs-form { display: flex; flex-direction: column; gap: 18px; }',
+      '.cs-field { display: flex; flex-direction: column; gap: 6px; }',
+      '.cs-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #4a5680; display: flex; align-items: center; gap: 6px; }',
+      '.cs-req { color: #0060ff; }',
+      '.cs-opt { font-weight: 400; text-transform: none; letter-spacing: 0; color: #7a87ab; font-size: 10px; }',
+      '.cs-hint { font-size: 12px; color: #7a87ab; }',
+      '#court-submit-root input[type="text"], #court-submit-root input[type="number"], #court-submit-root textarea { background: #f4f7ff; border: 1px solid #dde3f5; border-radius: 8px; color: #080f24; font-family: "DM Sans", sans-serif; font-size: 15px; padding: 12px 14px; outline: none; width: 100%; transition: border-color 0.15s, box-shadow 0.15s; -webkit-appearance: none; appearance: none; }',
+      '#court-submit-root input[type="text"]:focus, #court-submit-root input[type="number"]:focus { border-color: #0060ff; box-shadow: 0 0 0 3px rgba(0,96,255,0.2); }',
+      '#court-submit-root input::placeholder { color: #7a87ab; }',
+      '#court-submit-root input[type="number"] { font-family: "DM Mono", monospace; }',
+      '.cs-field.cs-invalid input, .cs-field.cs-invalid textarea { border-color: #EF4444 !important; box-shadow: 0 0 0 3px rgba(239,68,68,0.15) !important; }',
+      '.cs-err { font-size: 12px; color: #EF4444; display: none; align-items: center; gap: 4px; }',
+      '.cs-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }',
+      '.cs-row-csz { display: grid; grid-template-columns: 1fr 72px 108px; gap: 12px; }',
+      '@media (max-width: 500px) { .cs-row-csz { grid-template-columns: 1fr 1fr; } .cs-row-csz .cs-field:first-child { grid-column: 1 / -1; } }',
+      '.cs-coords-box { background: #edf1fd; border: 1px solid #dde3f5; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }',
+      '.cs-coords-note { font-family: "DM Mono", monospace; font-size: 11px; color: #7a87ab; line-height: 1.6; }',
+      '.cs-coords-note a { color: #0060ff; text-decoration: none; }',
+      '.cs-toggle-row { display: flex; gap: 10px; }',
+      '.cs-toggle-btn { flex: 1; background: #f4f7ff; border: 1px solid #dde3f5; border-radius: 8px; color: #7a87ab; cursor: pointer; font-family: "DM Sans", sans-serif; font-size: 13px; font-weight: 600; padding: 12px 8px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px; transition: all 0.15s; }',
+      '.cs-toggle-btn:hover { border-color: #b3c4f0; color: #080f24; }',
+      '.cs-toggle-btn.cs-active { background: rgba(0,96,255,0.08); border-color: #0060ff; color: #0060ff; }',
+      '.cs-toggle-icon { font-size: 20px; }',
+      '.cs-photo-drop { background: #f4f7ff; border: 1.5px dashed #dde3f5; border-radius: 10px; padding: 28px 20px; text-align: center; cursor: pointer; position: relative; overflow: hidden; transition: all 0.15s; }',
+      '.cs-photo-drop:hover { border-color: #0060ff; background: rgba(0,96,255,0.08); }',
+      '.cs-photo-drop input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }',
+      '.cs-photo-icon { font-size: 28px; margin-bottom: 8px; }',
+      '.cs-photo-text { color: #7a87ab; font-size: 13px; line-height: 1.5; }',
+      '.cs-photo-text strong { color: #0060ff; font-weight: 600; }',
+      '#cs-photo-preview { width: 100%; height: 200px; object-fit: cover; border-radius: 9px; display: none; }',
+      '#cs-photo-change { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.5)); color: #0060ff; font-size: 12px; font-weight: 600; padding: 20px 12px 10px; pointer-events: none; display: none; }',
+      '.cs-submit-btn { background: #0060ff; border: none; border-radius: 10px; color: #fff; cursor: pointer; font-family: "Bebas Neue", sans-serif; font-size: 20px; letter-spacing: 0.08em; padding: 16px 24px; width: 100%; margin-top: 8px; position: relative; transition: opacity 0.15s, transform 0.1s; }',
+      '.cs-submit-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }',
+      '.cs-submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }',
+      '#cs-spinner { display: none; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff; border-radius: 50%; animation: cs-spin 0.6s linear infinite; margin: 0 auto; }',
+      '@keyframes cs-spin { to { transform: rotate(360deg); } }',
+      '.cs-disclaimer { font-size: 12px; color: #7a87ab; text-align: center; line-height: 1.6; margin-top: 4px; }',
+      '.cs-success { display: none; background: rgba(34,197,94,0.07); border: 1px solid #22C55E; border-radius: 12px; padding: 32px 24px; text-align: center; flex-direction: column; align-items: center; gap: 10px; }',
+      '.cs-success-icon { font-size: 36px; }',
+      '.cs-success-title { font-family: "Bebas Neue", sans-serif; font-size: 28px; color: #22C55E; letter-spacing: 0.05em; }',
+      '.cs-success-body { color: #7a87ab; font-size: 14px; line-height: 1.6; max-width: 360px; }',
+      '.cs-success-again { margin-top: 8px; background: transparent; border: 1px solid #dde3f5; border-radius: 8px; color: #4a5680; cursor: pointer; font-family: "DM Sans", sans-serif; font-size: 13px; font-weight: 600; padding: 10px 20px; transition: all 0.15s; }',
+      '.cs-success-again:hover { border-color: #0060ff; color: #0060ff; }',
+      '.cs-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #fff; border: 1px solid #dde3f5; border-radius: 10px; padding: 14px 20px; font-size: 14px; font-weight: 500; font-family: "DM Sans", sans-serif; opacity: 0; transition: all 0.3s; pointer-events: none; white-space: nowrap; max-width: calc(100vw - 48px); z-index: 9999; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }',
+      '.cs-toast-success { border-color: #22C55E; color: #22C55E; }',
+      '.cs-toast-error { border-color: #EF4444; color: #EF4444; }',
+      '.cs-toast-show { opacity: 1; transform: translateX(-50%) translateY(0); }'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
+  // ── Inject Fonts ────────────────────────────────────────────────────────────
+  function cs_injectFonts() {
+    if (document.querySelector('link[href*="Bebas+Neue"]')) return;
+    var link = document.createElement('link');
+    link.href = 'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+  }
+
+  // ── Build HTML ──────────────────────────────────────────────────────────────
+  function cs_buildHTML(root) {
+    root.innerHTML = [
+      '<p class="cs-eyebrow">🏀 Proof of Play</p>',
+      '<h1 class="cs-title">Add a<br><span>Court</span></h1>',
+      '<p class="cs-subtitle">Know a court worth playing on? Add it to the database — no photo required. Courts go live immediately and earn you a badge once verified by our team.</p>',
+
+      '<div class="cs-success" id="cs-success">',
+        '<div class="cs-success-icon">🏀</div>',
+        '<div class="cs-success-title">Court Added!</div>',
+        '<div class="cs-success-body">The court is now live. You\'ll earn a badge once our team verifies your submission.</div>',
+        '<button class="cs-success-again" onclick="resetCourtForm()">Add Another Court</button>',
+      '</div>',
+
+      '<form class="cs-form" id="cs-form" novalidate>',
+
+        '<p class="cs-section">Court Info</p>',
+
+        '<div class="cs-field" id="cs-field-court-name">',
+          '<label class="cs-label">Court Name <span class="cs-req">*</span></label>',
+          '<input type="text" id="cs-court-name" placeholder="e.g. Wicker Park Full Court" maxlength="80" autocomplete="off" />',
+          '<span class="cs-err" id="cs-err-court-name"></span>',
+        '</div>',
+
+        '<div class="cs-field" id="cs-field-court-type">',
+          '<label class="cs-label">Facilities <span class="cs-req">*</span></label>',
+          '<p class="cs-hint">Select all that apply at this location</p>',
+          '<div class="cs-toggle-row">',
+            '<button type="button" class="cs-toggle-btn" data-value="Outdoor"><span class="cs-toggle-icon">☀️</span>Outdoor</button>',
+            '<button type="button" class="cs-toggle-btn" data-value="Indoor"><span class="cs-toggle-icon">🏢</span>Indoor</button>',
+            '<button type="button" class="cs-toggle-btn" data-value="Both"><span class="cs-toggle-icon">🏀</span>Both</button>',
+          '</div>',
+          '<span class="cs-err" id="cs-err-court-type"></span>',
+        '</div>',
+
+        '<p class="cs-section">Location</p>',
+
+        '<div class="cs-field">',
+          '<label class="cs-label">Address <span class="cs-opt">(optional)</span></label>',
+          '<input type="text" id="cs-address" placeholder="e.g. 3700 N Recreation Dr" />',
+        '</div>',
+
+        '<div class="cs-row-csz">',
+          '<div class="cs-field" id="cs-field-city">',
+            '<label class="cs-label">City <span class="cs-req">*</span></label>',
+            '<input type="text" id="cs-city" placeholder="Chicago" />',
+            '<span class="cs-err" id="cs-err-city"></span>',
+          '</div>',
+          '<div class="cs-field" id="cs-field-state">',
+            '<label class="cs-label">State <span class="cs-req">*</span></label>',
+            '<input type="text" id="cs-state" placeholder="IL" maxlength="50" />',
+            '<span class="cs-err" id="cs-err-state"></span>',
+          '</div>',
+          '<div class="cs-field">',
+            '<label class="cs-label">Zip <span class="cs-opt">(opt)</span></label>',
+            '<input type="text" id="cs-zip" placeholder="60612" maxlength="10" />',
+          '</div>',
+        '</div>',
+
+        '<div class="cs-field" id="cs-field-country">',
+          '<label class="cs-label">Country <span class="cs-req">*</span></label>',
+          '<input type="text" id="cs-country" placeholder="United States" value="United States" />',
+          '<span class="cs-err" id="cs-err-country"></span>',
+        '</div>',
+
+        '<p class="cs-section">GPS Coordinates</p>',
+
+        '<div class="cs-coords-box">',
+          '<p class="cs-coords-note">Find the court on <a href="https://maps.google.com" target="_blank">Google Maps</a>, right-click the exact spot, and copy the coordinates at the top of the menu. Latitude first, then longitude (negative for US locations).</p>',
+          '<div class="cs-row-2">',
+            '<div class="cs-field" id="cs-field-latitude">',
+              '<label class="cs-label">Latitude <span class="cs-req">*</span></label>',
+              '<input type="number" id="cs-latitude" placeholder="41.9562" step="0.0001" min="-90" max="90" />',
+              '<span class="cs-err" id="cs-err-latitude"></span>',
+            '</div>',
+            '<div class="cs-field" id="cs-field-longitude">',
+              '<label class="cs-label">Longitude <span class="cs-req">*</span></label>',
+              '<input type="number" id="cs-longitude" placeholder="-87.6383" step="0.0001" min="-180" max="180" />',
+              '<span class="cs-err" id="cs-err-longitude"></span>',
+            '</div>',
+          '</div>',
+        '</div>',
+
+        '<p class="cs-section">Court Photo</p>',
+
+        '<div class="cs-field">',
+          '<label class="cs-label">Photo <span class="cs-opt">(optional)</span></label>',
+          '<div class="cs-photo-drop" id="cs-photo-drop">',
+            '<input type="file" id="cs-photo-file" accept="image/*" />',
+            '<div id="cs-photo-content">',
+              '<div class="cs-photo-icon">📸</div>',
+              '<div class="cs-photo-text"><strong>Click to upload</strong> or drag &amp; drop<br>JPG, PNG, WEBP up to 10MB</div>',
+            '</div>',
+            '<img id="cs-photo-preview" alt="Court preview" />',
+            '<div id="cs-photo-change">Tap to change photo</div>',
+          '</div>',
+          '<p class="cs-hint" style="margin-top:6px">Or paste a photo URL instead:</p>',
+          '<input type="text" id="cs-photo-url" placeholder="https://example.com/court-photo.jpg" />',
+        '</div>',
+
+        '<div class="cs-divider" style="margin:8px 0"></div>',
+
+        '<button type="submit" class="cs-submit-btn" id="cs-submit-btn">',
+          '<span id="cs-btn-text">Submit Court</span>',
+          '<div id="cs-spinner"></div>',
+        '</button>',
+
+        '<p class="cs-disclaimer">Courts go live immediately with verified = 0. You\'ll earn a badge once our team approves the submission.</p>',
+
+      '</form>',
+      '<div class="cs-toast" id="cs-toast"></div>'
+    ].join('');
+  }
+
+  // ── Wire events ─────────────────────────────────────────────────────────────
+  function cs_wireEvents() {
+    // Toggles
+    document.querySelectorAll('.cs-toggle-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.cs-toggle-btn').forEach(function(b) { b.classList.remove('cs-active'); });
+        btn.classList.add('cs-active');
+        cs_selectedType = btn.getAttribute('data-value');
+        var err = document.getElementById('cs-err-court-type');
+        if (err) err.style.display = 'none';
+        var field = document.getElementById('cs-field-court-type');
+        if (field) field.classList.remove('cs-invalid');
+      });
+    });
+
+    // Photo file input
+    var fileInput = document.getElementById('cs-photo-file');
+    if (fileInput) {
+      fileInput.addEventListener('change', function() { cs_handleFileSelect(this); });
+    }
+
+    // Drag & drop
+    var drop = document.getElementById('cs-photo-drop');
+    if (drop) {
+      drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.style.borderColor = '#0060ff'; });
+      drop.addEventListener('dragleave', function() { drop.style.borderColor = ''; });
+      drop.addEventListener('drop', function(e) {
+        e.preventDefault(); drop.style.borderColor = '';
+        var file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+          var dt = new DataTransfer(); dt.items.add(file);
+          fileInput.files = dt.files;
+          cs_handleFileSelect(fileInput);
+        }
+      });
+    }
+
+    // Form submit
+    var form = document.getElementById('cs-form');
+    if (form) form.addEventListener('submit', cs_handleSubmit);
+  }
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+  function initCourtSubmit() {
+    var root = document.getElementById('court-submit-root');
+    if (!root) return;
+    cs_injectFonts();
+    cs_injectStyles();
+    cs_buildHTML(root);
+    cs_wireEvents();
+  }
+
+  // Run when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCourtSubmit);
+  } else {
+    initCourtSubmit();
+  }
+
+})();

@@ -3873,7 +3873,7 @@ function updateSidebarUI(player) {
       var lat = parseFloat(cs_val('cs-latitude'));
       var lng = parseFloat(cs_val('cs-longitude'));
       
-      var dupCheckResult = await window._supabase.rpc('check_court_duplicate', {
+      var dupCheckResult = await window._supabase.rpc('check_court_duplicate_webflow', {
         p_court_name: courtName,
         p_address: cs_val('cs-address') || null,
         p_latitude: lat,

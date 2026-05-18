@@ -3868,7 +3868,39 @@ function updateSidebarUI(player) {
         }
       } catch(authErr) { /* non-fatal */ }
 
-      // 2. Upload photo if file selected
+      // 2. Check for duplicate courts nearby (100m radius)
+      var courtName = cs_val('cs-court-name');
+      var lat = parseFloat(cs_val('cs-latitude'));
+      var lng = parseFloat(cs_val('cs-longitude'));
+      
+      var dupCheckResult = await window._supabase.rpc('check_court_duplicate', {
+        p_court_name: courtName,
+        p_address: cs_val('cs-address') || null,
+        p_latitude: lat,
+        p_longitude: lng,
+        p_indoor_or_outdoor: cs_selectedType
+      });
+
+      if (dupCheckResult.error) {
+        console.error('Duplicate check error:', dupCheckResult.error);
+        // Non-fatal — proceed anyway
+      } else if (dupCheckResult.data && dupCheckResult.data.length > 0) {
+        var dupResult = dupCheckResult.data[0];
+        if (dupResult.duplicate_found) {
+          btn.disabled = false;
+          if (btnText) btnText.style.display = '';
+          if (spinner) spinner.style.display = 'none';
+          
+          var distance = Math.round(dupResult.distance_m);
+          var facilityText = cs_selectedType === 'Both' ? 'indoor and outdoor facilities' : 'an ' + cs_selectedType + ' court';
+          var message = '"' + dupResult.existing_court_name + '" is already registered ' + distance + 'm from this location. If that court also has ' + facilityText + ', please let us know and we\'ll update it instead.';
+          
+          alert(message);
+          return;
+        }
+      }
+
+      // 3. Upload photo if file selected
       var photoUrl = cs_val('cs-photo-url') || null;
       var fileInput = document.getElementById('cs-photo-file');
       if (fileInput && fileInput.files.length > 0 && !photoUrl) {
@@ -3876,15 +3908,15 @@ function updateSidebarUI(player) {
         catch(e) { cs_showToast('Photo upload failed — submitting without it', 'error'); }
       }
 
-      // 3. Build payload
+      // 4. Build payload
       var has_indoor  = cs_selectedType === 'Indoor'  || cs_selectedType === 'Both';
       var has_outdoor = cs_selectedType === 'Outdoor' || cs_selectedType === 'Both';
 
       var payload = {
-        court_name:   cs_val('cs-court-name'),
+        court_name:   courtName,
         court_type:   cs_selectedType,
-        latitude:     parseFloat(cs_val('cs-latitude')),
-        longitude:    parseFloat(cs_val('cs-longitude')),
+        latitude:     lat,
+        longitude:    lng,
         city:         cs_val('cs-city'),
         state:        cs_val('cs-state'),
         Country:      cs_val('cs-country'),
@@ -3897,14 +3929,14 @@ function updateSidebarUI(player) {
       if (photoUrl)               payload['Court Photo']   = photoUrl;
       if (addedBy)                payload.added_by         = addedBy;
 
-      // 4. Insert via window._supabase
+      // 5. Insert via window._supabase
       var insertResult = await window._supabase
         .from('Courts')
         .insert(payload);
 
       if (insertResult.error) throw new Error(insertResult.error.message);
 
-      // 5. Success
+      // 6. Success
       var form = document.getElementById('cs-form');
       if (form) form.style.display = 'none';
       var success = document.getElementById('cs-success');

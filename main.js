@@ -35,7 +35,8 @@ const PUBLIC_PATHS = [
       else if (path.includes("/forgot-password")) initForgotPassword();
       if (window.location.pathname === '/groups') initCreateGroup();
       if (window.location.pathname === '/group-profiles') loadGroupProfile();
-
+if (document.getElementById('court-submit-root')) initCourtSubmit();
+      
       const signOutBtn = document.getElementById('sign-out-btn');
       if (signOutBtn) signOutBtn.addEventListener('click', signOut);
     });
@@ -93,7 +94,8 @@ var authListener = window._supabase.auth.onAuthStateChange(function (event, sess
             else if (path.includes("/forgot-password")) initForgotPassword();
             if (window.location.pathname === '/groups') initCreateGroup();
             if (window.location.pathname === '/group-profiles') loadGroupProfile();
-
+if (document.getElementById('court-submit-root')) initCourtSubmit();
+            
             const signOutBtn = document.getElementById('sign-out-btn');
             if (signOutBtn) signOutBtn.addEventListener('click', signOut);
 
@@ -3731,13 +3733,14 @@ function updateSidebarUI(player) {
 // Targets a Div Block with ID: court-submit-root
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SUPABASE_URL  = 'https://wscsrjaylotmcabdwvde.supabase.co';
-const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY'; // ← replace before deploying
-const BYTESCALE_ACCT = 'G22nhnC';
-const BYTESCALE_KEY  = 'Bearer public_G22nhnC83CH88avhAZxjkQq4tdkn';
+// Change these four lines in the court submit section:
+var SUPABASE_URL  = 'https://wscsrjaylotmcabdwvde.supabase.co';
+var SUPABASE_ANON = 'YOUR_ANON_KEY';
+var BYTESCALE_ACCT = 'G22nhnC';
+var BYTESCALE_KEY  = 'Bearer public_G22nhnC83CH88avhAZxjkQq4tdkn';
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let selectedType = '';
+var selectedType = '';
 
 // ── Auth token (reads Supabase session from localStorage) ────────────────────
 function getToken() {
@@ -4126,11 +4129,4 @@ function initCourtSubmit() {
 
   // Form submit
   document.getElementById('pop-court-form').addEventListener('submit', handleCourtSubmit);
-}
-
-// ── Run on DOM ready ──────────────────────────────────────────────────────────
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initCourtSubmit);
-} else {
-  initCourtSubmit();
 }

@@ -3893,7 +3893,7 @@ function updateSidebarUI(player) {
           
           var distance = Math.round(dupResult.distance_m);
           var facilityText = cs_selectedType === 'Both' ? 'indoor and outdoor facilities' : 'an ' + cs_selectedType + ' court';
-          var message = '"' + dupResult.existing_court_name + '" is already registered ' + distance + 'm from this location. If that court also has ' + facilityText + ', please let us know and we\'ll update it instead.';
+          var message = '"' + dupResult.existing_court_name + '" is already registered ' + distance + 'm from this location. If that court also has ' + facilityText + ', please let us know and we\'ll update it instead. Any other issues and please contact us via email.';
           
           alert(message);
           return;

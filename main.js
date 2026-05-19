@@ -3755,9 +3755,24 @@ function updateSidebarUI(player) {
     document.querySelectorAll('.cs-field').forEach(function(f) { f.classList.remove('cs-invalid'); });
     document.querySelectorAll('.cs-err').forEach(function(e) { e.style.display = 'none'; });
   }
-  function cs_validate() {
+ function cs_validate() {
     cs_clearAllErrors();
     var ok = true;
+
+    // Access type validation
+    var accessType = window._cs_getAccessType ? window._cs_getAccessType() : '';
+    if (!accessType) {
+      cs_setError('access-type', 'Please select who can access this court');
+      ok = false;
+    }
+    if (accessType === 'restricted') {
+      var notes = window._cs_getAccessNotes ? window._cs_getAccessNotes() : '';
+      if (!notes) {
+        cs_setError('access-notes', 'Please describe the access conditions');
+        ok = false;
+      }
+    }
+
     if (!cs_val('cs-court-name')) { cs_setError('court-name', 'Court name is required'); ok = false; }
     if (!cs_selectedType)         { cs_setError('court-type', 'Please select a facility type'); ok = false; }
     if (!cs_val('cs-city'))       { cs_setError('city', 'City is required'); ok = false; }
@@ -3769,7 +3784,6 @@ function updateSidebarUI(player) {
     if (!cs_val('cs-longitude') || isNaN(lng) || lng < -180 || lng > 180) { cs_setError('longitude', 'Valid longitude required (−180 to 180)'); ok = false; }
     return ok;
   }
-
   // ── Toast ───────────────────────────────────────────────────────────────────
   function cs_showToast(msg, type) {
     var t = document.getElementById('cs-toast');
@@ -3825,7 +3839,11 @@ function updateSidebarUI(player) {
     var success = document.getElementById('cs-success');
     if (success) success.style.display = 'none';
     document.querySelectorAll('.cs-toggle-btn').forEach(function(b) { b.classList.remove('cs-active'); });
-    cs_selectedType = '';
+cs_selectedType   = '';
+    if (window._cs_getAccessType) window._cs_getAccessType = function() { return ''; };
+    document.querySelectorAll('.cs-access-btn').forEach(function(b) { b.classList.remove('cs-active'); });
+    document.getElementById('cs-walkin-detail').style.display    = 'none';
+    document.getElementById('cs-restricted-detail').style.display = 'none';
     cs_clearAllErrors();
     var preview = document.getElementById('cs-photo-preview');
     if (preview) { preview.src = ''; preview.style.display = 'none'; }
@@ -3908,7 +3926,10 @@ function updateSidebarUI(player) {
         catch(e) { cs_showToast('Photo upload failed — submitting without it', 'error'); }
       }
 
-      // 4. Build payload
+// 4. Build payload
+      var accessType  = window._cs_getAccessType  ? window._cs_getAccessType()  : 'public';
+      var accessNotes = window._cs_getAccessNotes ? window._cs_getAccessNotes() : null;
+
       var has_indoor  = cs_selectedType === 'Indoor'  || cs_selectedType === 'Both';
       var has_outdoor = cs_selectedType === 'Outdoor' || cs_selectedType === 'Both';
 
@@ -3922,12 +3943,14 @@ function updateSidebarUI(player) {
         Country:      cs_val('cs-country'),
         verified:     0,
         has_indoor:   has_indoor,
-        has_outdoor:  has_outdoor
+        has_outdoor:  has_outdoor,
+        access_type:  accessType
       };
       if (cs_val('cs-address'))   payload.address          = cs_val('cs-address');
       if (cs_val('cs-zip'))       payload.zip_code         = cs_val('cs-zip');
       if (photoUrl)               payload['Court Photo']   = photoUrl;
       if (addedBy)                payload.added_by         = addedBy;
+      if (accessNotes)            payload.access_notes     = accessNotes;
 
       // 5. Insert via window._supabase
       var insertResult = await window._supabase
@@ -4014,7 +4037,17 @@ function updateSidebarUI(player) {
       '.cs-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #fff; border: 1px solid #dde3f5; border-radius: 10px; padding: 14px 20px; font-size: 14px; font-weight: 500; font-family: "DM Sans", sans-serif; opacity: 0; transition: all 0.3s; pointer-events: none; white-space: nowrap; max-width: calc(100vw - 48px); z-index: 9999; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }',
       '.cs-toast-success { border-color: #22C55E; color: #22C55E; }',
       '.cs-toast-error { border-color: #EF4444; color: #EF4444; }',
-      '.cs-toast-show { opacity: 1; transform: translateX(-50%) translateY(0); }'
+      '.cs-toast-show { opacity: 1; transform: translateX(-50%) translateY(0); }',
+      '.cs-access-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }',
+      '.cs-access-btn { background: #f4f7ff; border: 1px solid #dde3f5; border-radius: 8px; color: #7a87ab; cursor: pointer; font-family: "DM Sans", sans-serif; padding: 12px 10px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 3px; transition: all 0.15s; }',
+      '.cs-access-btn:hover { border-color: #b3c4f0; color: #080f24; }',
+      '.cs-access-btn.cs-active { background: rgba(0,96,255,0.08); border-color: #0060ff; color: #0060ff; }',
+      '.cs-access-label { font-size: 13px; font-weight: 600; }',
+      '.cs-access-sub { font-size: 11px; color: #7a87ab; }',
+      '.cs-access-btn.cs-active .cs-access-sub { color: #5580dd; }',
+      '.cs-walkin-note { background: rgba(0,96,255,0.05); border: 1px solid rgba(0,96,255,0.15); border-radius: 8px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #4a5680; line-height: 1.5; }',
+      '#court-submit-root textarea { background: #f4f7ff; border: 1px solid #dde3f5; border-radius: 8px; color: #080f24; font-family: "DM Sans", sans-serif; font-size: 15px; padding: 12px 14px; outline: none; width: 100%; transition: border-color 0.15s, box-shadow 0.15s; }',
+      '#court-submit-root textarea:focus { border-color: #0060ff; box-shadow: 0 0 0 3px rgba(0,96,255,0.2); }',
     ].join('\n');
     document.head.appendChild(style);
   }
@@ -4059,11 +4092,57 @@ function updateSidebarUI(player) {
             '<button type="button" class="cs-toggle-btn" data-value="Outdoor"><span class="cs-toggle-icon">☀️</span>Outdoor</button>',
             '<button type="button" class="cs-toggle-btn" data-value="Indoor"><span class="cs-toggle-icon">🏢</span>Indoor</button>',
             '<button type="button" class="cs-toggle-btn" data-value="Both"><span class="cs-toggle-icon">🏀</span>Both</button>',
-          '</div>',
-          '<span class="cs-err" id="cs-err-court-type"></span>',
-        '</div>',
+'</div>',
+        '<span class="cs-err" id="cs-err-court-type"></span>',
+      '</div>',
 
-        '<p class="cs-section">Location</p>',
+      // ── ACCESS TYPE ──────────────────────────────────────────────────────
+      '<div class="cs-field" id="cs-field-access-type">',
+        '<label class="cs-label">Who can access this court? <span class="cs-req">*</span></label>',
+        '<p class="cs-hint">Let players know before they show up</p>',
+        '<div class="cs-access-row">',
+          '<button type="button" class="cs-access-btn" data-access="public">',
+            '<span class="cs-toggle-icon">🔓</span>',
+            '<span class="cs-access-label">Public</span>',
+            '<span class="cs-access-sub">Free, anyone can play</span>',
+          '</button>',
+          '<button type="button" class="cs-access-btn" data-access="walk_in">',
+            '<span class="cs-toggle-icon">💰</span>',
+            '<span class="cs-access-label">Walk-Ins Welcome</span>',
+            '<span class="cs-access-sub">Drop-in fee applies</span>',
+          '</button>',
+          '<button type="button" class="cs-access-btn" data-access="members_only">',
+            '<span class="cs-toggle-icon">🔑</span>',
+            '<span class="cs-access-label">Members Only</span>',
+            '<span class="cs-access-sub">Membership required</span>',
+          '</button>',
+          '<button type="button" class="cs-access-btn" data-access="restricted">',
+            '<span class="cs-toggle-icon">🕐</span>',
+            '<span class="cs-access-label">Restricted</span>',
+            '<span class="cs-access-sub">Time/permit/conditions</span>',
+          '</button>',
+        '</div>',
+        '<span class="cs-err" id="cs-err-access-type"></span>',
+      '</div>',
+
+      // Walk-in info (shown when walk_in selected)
+      '<div class="cs-field cs-access-detail" id="cs-walkin-detail" style="display:none">',
+        '<label class="cs-label">Walk-in pricing</label>',
+        '<div class="cs-walkin-note">',
+          '<span style="font-size:18px">💰</span>',
+          '<span>Walk-in pricing varies. Players should <strong>call ahead</strong> or check the facility\'s website for current day-pass rates.</span>',
+        '</div>',
+      '</div>',
+
+      // Restricted notes (shown when restricted selected, required)
+      '<div class="cs-field cs-access-detail" id="cs-restricted-detail" style="display:none">',
+        '<label class="cs-label">Access details <span class="cs-req">*</span></label>',
+        '<textarea id="cs-access-notes" rows="3" placeholder="e.g. Open to public 6–9 PM weekdays only&#10;e.g. School court — permit required&#10;e.g. Must be 18+" style="resize:vertical"></textarea>',
+        '<span class="cs-err" id="cs-err-access-notes"></span>',
+      '</div>',
+      // ── END ACCESS TYPE ──────────────────────────────────────────────────
+
+      '<p class="cs-section">Location</p>',
 
         '<div class="cs-field">',
           '<label class="cs-label">Address <span class="cs-opt">(optional)</span></label>',
@@ -4143,8 +4222,8 @@ function updateSidebarUI(player) {
   }
 
   // ── Wire events ─────────────────────────────────────────────────────────────
-  function cs_wireEvents() {
-    // Toggles
+function cs_wireEvents() {
+    // Facility type toggles
     document.querySelectorAll('.cs-toggle-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         document.querySelectorAll('.cs-toggle-btn').forEach(function(b) { b.classList.remove('cs-active'); });
@@ -4156,6 +4235,28 @@ function updateSidebarUI(player) {
         if (field) field.classList.remove('cs-invalid');
       });
     });
+
+    // Access type buttons
+    var cs_selectedAccess = '';
+    document.querySelectorAll('.cs-access-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.cs-access-btn').forEach(function(b) { b.classList.remove('cs-active'); });
+        btn.classList.add('cs-active');
+        cs_selectedAccess = btn.getAttribute('data-access');
+        document.getElementById('cs-walkin-detail').style.display    = cs_selectedAccess === 'walk_in'    ? '' : 'none';
+        document.getElementById('cs-restricted-detail').style.display = cs_selectedAccess === 'restricted' ? '' : 'none';
+        var err = document.getElementById('cs-err-access-type');
+        if (err) err.style.display = 'none';
+        var field = document.getElementById('cs-field-access-type');
+        if (field) field.classList.remove('cs-invalid');
+      });
+    });
+
+    window._cs_getAccessType  = function() { return cs_selectedAccess; };
+    window._cs_getAccessNotes = function() {
+      var el = document.getElementById('cs-access-notes');
+      return el ? el.value.trim() : '';
+    };
 
     // Photo file input
     var fileInput = document.getElementById('cs-photo-file');

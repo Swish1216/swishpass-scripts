@@ -2483,9 +2483,15 @@ async function initLogin() {
   const container = document.getElementById("login-container");
   if (!container) return;
 
+// Detect if user just confirmed their email (Supabase puts token_type=signup in hash)
+  const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+  const isJustConfirmed = hashParams.get('type') === 'signup' || 
+                          new URLSearchParams(window.location.search).get('confirmed') === 'true';
+
   container.innerHTML = `
     <div class="pop-form">
       <h2 class="pop-title">Welcome back</h2>
+      ${isJustConfirmed ? `<div style="background:#e6f4ea;border:1px solid #2d7a3a;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:14px;color:#2d7a3a;">✓ Email confirmed! Sign in to get started.</div>` : ''}
       <input type="email" id="login-email" class="pop-input" placeholder="Email" />
       <input type="password" id="login-password" class="pop-input" style="margin-top:12px;" placeholder="Password" />
       <div id="login-feedback" class="pop-feedback"></div>
@@ -2522,7 +2528,21 @@ async function initLogin() {
       return;
     }
 
-    window.location.href = "/sp-home";
+// Check onboarding state before redirecting
+    const { data: { session } } = await window._supabase.auth.getSession();
+    const { data: player } = await window._supabase
+      .from('Players')
+      .select('"Username", "Position"')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!player || !player.Username) {
+      window.location.href = '/username-setup';
+    } else if (!player.Position) {
+      window.location.href = '/profile-setup';
+    } else {
+      window.location.href = '/sp-home';
+    }
   });
 }
 
@@ -3300,7 +3320,7 @@ window.resendConfirmation = async function () {
   const { error } = await window._supabase.auth.resend({
     type: 'signup',
     email: session.user.email,
-    options: { emailRedirectTo: 'https://swishpass.webflow.io/confirm-email' }
+options: { emailRedirectTo: 'https://swishpass.webflow.io/sign-in' }
   });
 
   if (error) {

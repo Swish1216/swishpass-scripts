@@ -20,6 +20,20 @@ const PUBLIC_PATHS = [
   "/coming-soon"
 ];
 
+// ── Supabase email confirmation redirect ──────────────────────────────────
+// Supabase sends confirmation links to the root domain with the token in the
+// hash. Detect it here and forward to /sign-in so the banner can display.
+(function() {
+  if (window.location.hash && window.location.hash.includes('access_token')) {
+    var hash = window.location.hash;
+    var path = window.location.pathname;
+    // Only intercept on pages that aren't /sign-in already
+    if (!path.includes('/sign-in') && !path.includes('/change-password')) {
+      window.location.replace('/sign-in' + hash);
+    }
+  }
+})();
+
 (function () {
   const path = window.location.pathname;
   const isPublic = PUBLIC_PATHS.some(function (p) { return path.includes(p); });

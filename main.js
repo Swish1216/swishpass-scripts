@@ -285,7 +285,7 @@ var result = await window._supabase
     return '<option value="' + s + '" ' + (s === state ? 'selected' : '') + '>' + s + '</option>';
   }).join('');
   container.innerHTML = ''
-    + '<div style="padding:0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch;">'
+    + '<div style="padding:0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;">'
     + '<h2 style="font-size:22px;font-weight:500;margin-bottom:1.25rem;color:#111;">Player leaderboard</h2>'
     + '<div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap;">'
     + '<input id="lb-search" type="text" placeholder="Search" value="' + search + '" oninput="loadLeaderboard()" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;" />'
@@ -430,7 +430,7 @@ window.loadCourts = async function() {
     + '<option value="0"' + (verified === '0' ? ' selected' : '') + '>Unverified Only</option>'
     + '</select>'
     + '</div>'
-    + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;display:block;">'
+    + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;max-width:100%;display:block;box-sizing:border-box;">'
     + '<table style="min-width:900px;width:100%;border-collapse:collapse;font-size:13px;">'
     + '<thead><tr style="border-bottom:1px solid #eee;">'
     + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Court Name</th>'
@@ -1193,7 +1193,7 @@ window.initLiveCourtFeed = async function() {
     + '<h2 style="font-size:22px;font-weight:500;margin-bottom:8px;color:#111;">Live Court Feed</h2>'
     + '<p style="font-size:13px;color:#888;margin-bottom:1rem;">See how busy each court is right now. Updates automatically.</p>'
     + '<input id="lcf-search" type="text" placeholder="Search courts..." oninput="renderLiveCourtFeed()" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:1rem;color:#111;box-sizing:border-box;" />'
-    + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;">'
+    + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;max-width:100%;box-sizing:border-box;">'
     + '<table style="min-width:700px;width:100%;border-collapse:collapse;font-size:13px;">'
     + '<thead><tr style="border-bottom:1px solid #eee;">'
     + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Court Name</th>'
@@ -3710,7 +3710,7 @@ function updateHeaderAuthUI(session) {
             if (result.data && result.data.Username) {
 welcomeMsg.innerHTML = 'Welcome, <span style="color: #0060ff;">' + result.data.Username + '</span>';
 welcomeMsg.style.display = 'block';
-welcomeMsg.style.fontSize = '48px';
+welcomeMsg.style.fontSize = window.innerWidth <= 991 ? '26px' : '48px';
 welcomeMsg.style.fontWeight = '700';
 welcomeMsg.style.color = '#111';
 welcomeMsg.style.letterSpacing = '-1px';
@@ -4016,7 +4016,7 @@ cs_selectedType   = '';
     var style = document.createElement('style');
     style.id = 'cs-styles';
     style.textContent = [
-      '#court-submit-root { font-family: "DM Sans", sans-serif; font-size: 15px; line-height: 1.5; color: #080f24; max-width: 640px; margin: 0 auto; padding: 40px 0 80px; }',
+'#court-submit-root { font-family: "DM Sans", sans-serif; font-size: 15px; line-height: 1.5; color: #080f24; max-width: 640px; margin: 0 auto; padding: 40px 16px 80px; box-sizing: border-box; width: 100%; }',
       '#court-submit-root * { box-sizing: border-box; }',
       '.cs-eyebrow { font-family: "DM Mono", monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: #0060ff; margin-bottom: 10px; }',
       '.cs-title { font-family: "Bebas Neue", sans-serif; font-size: clamp(56px, 10vw, 80px); line-height: 0.92; letter-spacing: 0.02em; color: #080f24; margin-bottom: 16px; }',

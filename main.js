@@ -2836,10 +2836,29 @@ async function loadGroupProfile() {
 
   const myMembership = members.find(m => m.player_id === player.playerId);
   const isOwner  = myMembership && myMembership.role === 'owner';
+  const isAdmin  = myMembership && myMembership.role === 'admin';
   const isMember = !!myMembership;
+  const canManageRequests = isOwner || isAdmin;
   const canJoin  = !isMember && !group.is_private && player.playerId;
+  const isLockedOut = group.is_private && !isMember;
 
-  // Build members list HTML
+  // Check if the current player has already requested to join
+  let requestStatus = 'none'; // 'none' | 'pending' | 'declined'
+  let existingRequestId = null;
+  if (isLockedOut && player.playerId) {
+    const { data: reqCheck } = await window._supabase
+      .from('Group_Join_Requests')
+      .select('id, status')
+      .eq('group_id', group.id)
+      .eq('player_id', player.playerId)
+      .limit(1);
+    if (reqCheck && reqCheck.length > 0) {
+      requestStatus = reqCheck[0].status;
+      existingRequestId = reqCheck[0].id;
+    }
+  }
+
+  // Build members list HTML (only shown to members)
   const membersHTML = members.map(m => {
     const p = playerMap[m.player_id] || {};
     const isMe = m.player_id === player.playerId;
@@ -2865,6 +2884,37 @@ async function loadGroupProfile() {
     `;
   }).join('');
 
+  // Build the request to join button label
+  const requestBtnLabel =
+    requestStatus === 'pending'  ? 'Request Sent' :
+    requestStatus === 'declined' ? 'Request Declined' :
+    'Request to Join';
+  const requestBtnDisabled = requestStatus === 'pending' || requestStatus === 'declined';
+  const requestBtnStyle = requestBtnDisabled
+    ? 'width:100%;padding:12px;font-size:15px;font-weight:600;background:#f5f5f5;color:#888;border:1px solid #ddd;border-radius:8px;cursor:not-allowed;margin-bottom:12px;'
+    : 'width:100%;padding:12px;font-size:15px;font-weight:600;background:#378add;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-bottom:12px;';
+  const requestNote =
+    requestStatus === 'pending'  ? '<p style="font-size:13px;color:#888;text-align:center;margin:0 0 16px;">The group owner will review your request.</p>' :
+    requestStatus === 'declined' ? '<p style="font-size:13px;color:#e24b4a;text-align:center;margin:0 0 16px;">Your request was not accepted.</p>' :
+    '';
+
+  // Locked state block (private + non-member)
+  const lockedHTML = `
+    <div style="text-align:center;padding:48px 24px 32px;">
+      <div style="font-size:48px;margin-bottom:16px;">🔒</div>
+      <h3 style="font-size:18px;font-weight:700;color:#111;margin:0 0 8px;">This group is private</h3>
+      <p style="font-size:14px;color:#888;margin:0 0 24px;line-height:1.6;">Members, posts, and leaderboard are only visible to group members.</p>
+      ${player.playerId ? `
+        <button
+          data-action="request-join"
+          style="${requestBtnStyle}"
+          ${requestBtnDisabled ? 'disabled' : ''}
+        >${requestBtnLabel}</button>
+        ${requestNote}
+      ` : '<p style="font-size:14px;color:#888;">Sign in to request access.</p>'}
+    </div>
+  `;
+
   // Render full profile
   container.innerHTML = `
     <div style="padding:0 16px;max-width:640px;margin:0 auto;">
@@ -2879,7 +2929,7 @@ async function loadGroupProfile() {
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <span style="font-size:12px;color:#888;">${members.length} member${members.length === 1 ? '' : 's'}</span>
             <span style="color:#ddd;">·</span>
-            <span style="padding:2px 8px;background:${group.is_private ? '#f5f5f5' : '#e6f4ea'};color:${group.is_private ? '#888' : '#2d7a3a'};border-radius:4px;font-size:11px;font-weight:500;">${group.is_private ? 'Private' : 'Public'}</span>
+            <span style="padding:2px 8px;background:${group.is_private ? '#f5f5f5' : '#e6f4ea'};color:${group.is_private ? '#888' : '#2d7a3a'};border-radius:4px;font-size:11px;font-weight:500;">${group.is_private ? '🔒 Private' : '🔓 Public'}</span>
           </div>
         </div>
       </div>
@@ -2887,77 +2937,86 @@ async function loadGroupProfile() {
       <!-- Description -->
       ${group.description ? `<p style="font-size:14px;color:#555;margin:0 0 24px;line-height:1.6;padding:14px 16px;background:#fafafa;border-radius:8px;border:1px solid #eee;">${group.description}</p>` : ''}
 
-      <!-- Join Button (public, non-member) -->
-      ${canJoin ? `
-        <button data-action="join-group" style="width:100%;padding:12px;font-size:15px;font-weight:600;background:#378add;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-bottom:24px;">
-          Join Group
-        </button>
+      <!-- Owner/Admin: Join requests panel -->
+      ${canManageRequests && group.is_private ? `
+        <div id="join-requests-panel" style="background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;margin-bottom:20px;">
+          <div style="padding:14px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;">
+            <h2 style="font-size:15px;font-weight:600;color:#111;margin:0;">📬 Join Requests</h2>
+            <button data-action="load-requests" style="padding:6px 14px;background:#378add;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">View</button>
+          </div>
+          <div id="join-requests-list" style="display:none;"></div>
+        </div>
       ` : ''}
 
-      <!-- Members -->
-      <div style="background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;margin-bottom:20px;">
-        <div style="padding:14px 16px;border-bottom:1px solid #f0f0f0;">
-          <h2 style="font-size:15px;font-weight:600;color:#111;margin:0;">Members</h2>
-        </div>
-        ${membersHTML || '<p style="padding:2rem;text-align:center;color:#888;font-size:14px;">No members yet.</p>'}
-      </div>
+      <!-- Locked state OR join button OR members -->
+      ${isLockedOut ? lockedHTML : `
+        ${canJoin ? `
+          <button data-action="join-group" style="width:100%;padding:12px;font-size:15px;font-weight:600;background:#378add;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-bottom:24px;">
+            Join Group
+          </button>
+        ` : ''}
 
-      <!-- Add Member (owner only) -->
-      ${isOwner ? `
+        <!-- Members -->
         <div style="background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;margin-bottom:20px;">
           <div style="padding:14px 16px;border-bottom:1px solid #f0f0f0;">
-            <h2 style="font-size:15px;font-weight:600;color:#111;margin:0;">Add a Player</h2>
+            <h2 style="font-size:15px;font-weight:600;color:#111;margin:0;">Members</h2>
+          </div>
+          ${membersHTML || '<p style="padding:2rem;text-align:center;color:#888;font-size:14px;">No members yet.</p>'}
+        </div>
+
+        <!-- Add Member (owner only) -->
+        ${isOwner ? `
+          <div style="background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;margin-bottom:20px;">
+            <div style="padding:14px 16px;border-bottom:1px solid #f0f0f0;">
+              <h2 style="font-size:15px;font-weight:600;color:#111;margin:0;">Add a Player</h2>
+            </div>
+            <div style="padding:16px;">
+              <input data-group="add-member-search" type="text" placeholder="Search by username..."
+                style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;color:#111;font-family:inherit;" />
+              <div data-group="add-member-results" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+              <p data-group="add-member-error" style="color:#e24b4a;font-size:13px;margin:8px 0 0;min-height:16px;"></p>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Transfer Ownership Panel -->
+        <div data-group="transfer-ownership-panel" style="display:none;background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;margin-bottom:20px;">
+          <div style="padding:14px 16px;border-bottom:1px solid #f0f0f0;">
+            <h2 style="font-size:15px;font-weight:600;color:#111;margin:0;">Transfer Ownership</h2>
+            <p style="font-size:13px;color:#888;margin:4px 0 0;">Choose a new owner before you leave.</p>
           </div>
           <div style="padding:16px;">
-            <input
-              data-group="add-member-search"
-              type="text"
-              placeholder="Search by username..."
-              style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;color:#111;font-family:inherit;"
-            />
-            <div data-group="add-member-results" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
-            <p data-group="add-member-error" style="color:#e24b4a;font-size:13px;margin:8px 0 0;min-height:16px;"></p>
+            <select data-group="transfer-select" style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;color:#111;background:#fff;font-family:inherit;margin-bottom:12px;">
+              <option value="">Select new owner...</option>
+            </select>
+            <button data-action="confirm-transfer" style="width:100%;padding:12px;font-size:14px;font-weight:600;background:#111;color:#fff;border:none;border-radius:8px;cursor:pointer;">
+              Confirm Transfer &amp; Leave
+            </button>
           </div>
         </div>
-      ` : ''}
 
-      <!-- Transfer Ownership Panel (hidden until needed) -->
-      <div data-group="transfer-ownership-panel" style="display:none;background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;margin-bottom:20px;">
-        <div style="padding:14px 16px;border-bottom:1px solid #f0f0f0;">
-          <h2 style="font-size:15px;font-weight:600;color:#111;margin:0;">Transfer Ownership</h2>
-          <p style="font-size:13px;color:#888;margin:4px 0 0;">Choose a new owner before you leave.</p>
+        <!-- Member/Owner actions -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          ${isMember && !isOwner ? `
+            <button data-action="leave-group" style="flex:1;padding:12px;font-size:14px;font-weight:500;background:#fff;color:#e24b4a;border:1px solid #e24b4a;border-radius:8px;cursor:pointer;">
+              Leave Group
+            </button>
+          ` : ''}
+          ${isOwner ? `
+            <button data-action="leave-group" style="flex:1;padding:12px;font-size:14px;font-weight:500;background:#fff;color:#e24b4a;border:1px solid #e24b4a;border-radius:8px;cursor:pointer;">
+              Leave Group
+            </button>
+            <button data-action="delete-group" style="flex:1;padding:12px;font-size:14px;font-weight:500;background:#e24b4a;color:#fff;border:none;border-radius:8px;cursor:pointer;">
+              Delete Group
+            </button>
+          ` : ''}
         </div>
-        <div style="padding:16px;">
-          <select data-group="transfer-select" style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;color:#111;background:#fff;font-family:inherit;margin-bottom:12px;">
-            <option value="">Select new owner...</option>
-          </select>
-          <button data-action="confirm-transfer" style="width:100%;padding:12px;font-size:14px;font-weight:600;background:#111;color:#fff;border:none;border-radius:8px;cursor:pointer;">
-            Confirm Transfer &amp; Leave
-          </button>
-        </div>
-      </div>
-
-      <!-- Owner + Member Actions -->
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        ${isMember && !isOwner ? `
-          <button data-action="leave-group" style="flex:1;padding:12px;font-size:14px;font-weight:500;background:#fff;color:#e24b4a;border:1px solid #e24b4a;border-radius:8px;cursor:pointer;">
-            Leave Group
-          </button>
-        ` : ''}
-        ${isOwner ? `
-          <button data-action="leave-group" style="flex:1;padding:12px;font-size:14px;font-weight:500;background:#fff;color:#e24b4a;border:1px solid #e24b4a;border-radius:8px;cursor:pointer;">
-            Leave Group
-          </button>
-          <button data-action="delete-group" style="flex:1;padding:12px;font-size:14px;font-weight:500;background:#e24b4a;color:#fff;border:none;border-radius:8px;cursor:pointer;">
-            Delete Group
-          </button>
-        ` : ''}
-      </div>
+      `}
 
     </div>
   `;
 
-  // Wire up remove buttons
+  // ── Wire up remove buttons ────────────────────────────────────────────────
   container.querySelectorAll('[data-action="remove-member"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const targetPlayerId = parseInt(btn.dataset.playerId);
@@ -2965,7 +3024,7 @@ async function loadGroupProfile() {
     });
   });
 
-  // Wire up join button
+  // ── Wire up join button (public groups) ───────────────────────────────────
   const joinBtn = container.querySelector('[data-action="join-group"]');
   if (joinBtn && canJoin) {
     joinBtn.addEventListener('click', async () => {
@@ -2984,21 +3043,147 @@ async function loadGroupProfile() {
     });
   }
 
-  // Wire up add member search
+  // ── Wire up Request to Join button ────────────────────────────────────────
+  const requestBtn = container.querySelector('[data-action="request-join"]');
+  if (requestBtn && !requestBtnDisabled) {
+    requestBtn.addEventListener('click', async () => {
+      requestBtn.disabled = true;
+      requestBtn.textContent = 'Sending...';
+      const { data: newReq, error } = await window._supabase
+        .from('Group_Join_Requests')
+        .insert({ group_id: group.id, player_id: player.playerId, status: 'pending' })
+        .select('id')
+        .limit(1);
+      if (error) {
+        if (error.code === '23505') {
+          // Already requested — just update the button
+          requestBtn.textContent = 'Request Sent';
+          requestBtn.style.background = '#f5f5f5';
+          requestBtn.style.color = '#888';
+          requestBtn.style.border = '1px solid #ddd';
+          requestBtn.style.cursor = 'not-allowed';
+        } else {
+          alert('Could not send request. Please try again.');
+          requestBtn.disabled = false;
+          requestBtn.textContent = 'Request to Join';
+        }
+        return;
+      }
+      requestBtn.textContent = 'Request Sent';
+      requestBtn.style.background = '#f5f5f5';
+      requestBtn.style.color = '#888';
+      requestBtn.style.border = '1px solid #ddd';
+      requestBtn.style.cursor = 'not-allowed';
+      const noteEl = requestBtn.nextElementSibling;
+      if (noteEl) {
+        noteEl.textContent = 'The group owner will review your request.';
+        noteEl.style.color = '#888';
+        noteEl.style.display = 'block';
+      }
+    });
+  }
+
+  // ── Wire up View Join Requests button (owner/admin) ───────────────────────
+  const loadRequestsBtn = container.querySelector('[data-action="load-requests"]');
+  const requestsList = document.getElementById('join-requests-list');
+  if (loadRequestsBtn && requestsList) {
+    loadRequestsBtn.addEventListener('click', async () => {
+      loadRequestsBtn.textContent = 'Loading...';
+      loadRequestsBtn.disabled = true;
+      await renderJoinRequestsList(group.id, requestsList);
+      requestsList.style.display = 'block';
+      loadRequestsBtn.style.display = 'none';
+    });
+  }
+
+  // ── Wire up add member search (owner only) ────────────────────────────────
   if (isOwner) initAddMember(group.id, members.map(m => m.player_id));
 
-  // Wire up leave button
+  // ── Wire up leave button ──────────────────────────────────────────────────
   const leaveBtn = container.querySelector('[data-action="leave-group"]');
   if (leaveBtn && isMember) {
     leaveBtn.addEventListener('click', () => leaveGroup(group, members, player.playerId));
   }
 
-  // Wire up delete button
+  // ── Wire up delete button ─────────────────────────────────────────────────
   const deleteBtn = container.querySelector('[data-action="delete-group"]');
   if (deleteBtn && isOwner) {
     deleteBtn.addEventListener('click', () => deleteGroup(group));
   }
 }
+
+
+async function renderJoinRequestsList(groupId, container) {
+  const { data: reqData } = await window._supabase
+    .from('Group_Join_Requests')
+    .select('id, player_id, requested_at, status')
+    .eq('group_id', groupId)
+    .eq('status', 'pending')
+    .order('requested_at', { ascending: true });
+
+  if (!reqData || reqData.length === 0) {
+    container.innerHTML = '<p style="padding:16px;color:#888;font-size:14px;text-align:center;">No pending join requests.</p>';
+    return;
+  }
+
+  const pids = reqData.map(r => r.player_id);
+  const { data: players } = await window._supabase
+    .from('Players')
+    .select('player_id, Username, Tier, "Profile Photo URL"')
+    .in('player_id', pids);
+
+  const pMap = {};
+  (players || []).forEach(p => { pMap[p.player_id] = p; });
+
+  container.innerHTML = reqData.map(req => {
+    const p = pMap[req.player_id] || {};
+    const photo = p['Profile Photo URL']
+      ? `<img src="${p['Profile Photo URL']}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`
+      : `<div style="width:36px;height:36px;border-radius:50%;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#888;font-size:13px;font-weight:500;flex-shrink:0;">${(p.Username || '?').charAt(0).toUpperCase()}</div>`;
+    return `
+      <div id="req-row-${req.id}" style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f5f5f5;">
+        ${photo}
+        <div style="flex:1;min-width:0;">
+          <p style="font-size:14px;font-weight:500;color:#111;margin:0 0 2px;">${p.Username || 'Unknown'}</p>
+          <p style="font-size:12px;color:#888;margin:0;">${p.Tier || ''}</p>
+        </div>
+        <button onclick="handleAcceptRequest('${req.id}', ${req.player_id}, '${groupId}')"
+          style="padding:6px 14px;background:#2d7a3a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">
+          Accept
+        </button>
+        <button onclick="handleDeclineRequest('${req.id}')"
+          style="padding:6px 14px;background:#fff;color:#e24b4a;border:1px solid #e24b4a;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">
+          Decline
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+window.handleAcceptRequest = async function(requestId, playerId, groupId) {
+  const row = document.getElementById('req-row-' + requestId);
+  if (row) row.style.opacity = '0.5';
+
+  const { error: insertErr } = await window._supabase
+    .from('Group Members')
+    .insert([{ group_id: groupId, player_id: playerId, role: 'member' }]);
+
+  if (insertErr) {
+    alert('Could not accept request. Try again.');
+    if (row) row.style.opacity = '1';
+    return;
+  }
+
+  await window._supabase.from('Group_Join_Requests').delete().eq('id', requestId);
+  if (row) row.remove();
+};
+
+window.handleDeclineRequest = async function(requestId) {
+  const row = document.getElementById('req-row-' + requestId);
+  if (row) row.style.opacity = '0.5';
+  await window._supabase.from('Group_Join_Requests').delete().eq('id', requestId);
+  if (row) row.remove();
+};
 // ============================================================
 // ADD MEMBER — search by username, owner only
 // ============================================================

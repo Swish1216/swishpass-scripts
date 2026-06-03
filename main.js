@@ -1749,7 +1749,7 @@ window.loadGroupPlayerLeaderboard = async function() {
 
   var groupResult = await window._supabase
     .from('Groups')
-    .select('"id", "group_name"')
+.select('"id", "group_name", "is_private"')
     .eq('group_number', groupNumber)
     .limit(1);
 
@@ -1758,8 +1758,25 @@ window.loadGroupPlayerLeaderboard = async function() {
     return;
   }
 
-  var groupId = groupResult.data[0].id;
+var groupId = groupResult.data[0].id;
   var groupName = groupResult.data[0].group_name;
+  var groupIsPrivate = groupResult.data[0].is_private;
+
+  // Privacy gate
+  if (groupIsPrivate) {
+    var currentPlayer = await getCurrentPlayer();
+    var memberCheck = await window._supabase
+      .from('Group Members')
+      .select('player_id')
+      .eq('group_id', groupId)
+      .eq('player_id', currentPlayer.playerId)
+      .limit(1);
+    var isMember = memberCheck.data && memberCheck.data.length > 0;
+    if (!isMember) {
+      container.innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">🔒 This group is private.</p>';
+      return;
+    }
+  }
 
   var membersResult = await window._supabase
     .from('Group Members')
@@ -1845,7 +1862,7 @@ window.addEventListener('load', async function() {
 
   var groupResult = await window._supabase
     .from('Groups')
-    .select('"id"')
+    .select('"id", "is_private"')
     .eq('group_number', groupNumber)
     .limit(1);
 
@@ -1855,6 +1872,23 @@ window.addEventListener('load', async function() {
   }
 
   var groupId = groupResult.data[0].id;
+  var groupIsPrivate = groupResult.data[0].is_private;
+
+  // Privacy gate
+  if (groupIsPrivate) {
+    var currentPlayer = await getCurrentPlayer();
+    var memberCheck = await window._supabase
+      .from('Group Members')
+      .select('player_id')
+      .eq('group_id', groupId)
+      .eq('player_id', currentPlayer.playerId)
+      .limit(1);
+    var isMember = memberCheck.data && memberCheck.data.length > 0;
+    if (!isMember) {
+      document.getElementById('sf-group-container').innerHTML = '<p style="padding:2rem;text-align:center;color:#888;">🔒 This group is private.</p>';
+      return;
+    }
+  }
 
   var membersResult = await window._supabase
     .from('Group Members')

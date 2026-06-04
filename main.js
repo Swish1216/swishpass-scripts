@@ -1153,14 +1153,15 @@ window.submitVerification = async function(sessionId, verifierSessionId, vote) {
 
   if (!confirm(confirmMsg)) return;
 
-  var result = await window._supabase
-    .from('Verifications')
-    .insert({
-      session_id: sessionId,
-      verifier_id: currentPlayerProfileNumber,
-      verifier_session_id: verifierSessionId,
-      vote: vote
-    });
+var result = await window._supabase
+  .from('session_validations')
+  .insert({
+    session_id: sessionId,
+    validator_player_id: currentPlayerProfileNumber,
+    session_owner_id: theirSession.player_id,
+    court_id: theirSession.court_id,
+    validation_result: vote === 'confirmed' ? 'confirmed' : 'disputed'
+  });
 
   if (result.error) {
     console.error(result.error);

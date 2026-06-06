@@ -1019,7 +1019,6 @@ window.removeFriend = async function(friendId) {
 window.addEventListener('load', async function() {
   if (!document.getElementById('verify-sessions-container')) return;
 
-  // REPLACED: was window.$memberstackDom block
   var player = await getCurrentPlayer();
   currentPlayerEmail = player.email;
   currentPlayerProfileNumber = player.playerId;
@@ -1053,10 +1052,12 @@ window.loadVerifySessions = async function() {
     return;
   }
 
+  // FIX 1: was reading from 'Verifications' with 'verifier_id' — now reads from
+  // session_validations with validator_player_id (the correct table and column)
   var myVerificationsResult = await window._supabase
-    .from('Verifications')
+    .from('session_validations')
     .select('session_id')
-    .eq('verifier_id', currentPlayerProfileNumber);
+    .eq('validator_player_id', currentPlayerProfileNumber);
 
   var alreadyVerifiedIds = (myVerificationsResult.data || []).map(function(v) { return v.session_id; });
 
@@ -1122,6 +1123,8 @@ window.loadVerifySessions = async function() {
       ? '<img src="' + s.Images + '" style="width:100%;max-height:300px;object-fit:cover;border-radius:8px;display:block;margin-bottom:12px;" />'
       : '';
 
+    // FIX 2: pass court_id and player_id as arguments to submitVerification so
+    // they are available in that function's scope (theirSession was undefined there)
     return '<div style="border:1px solid #eee;border-radius:12px;padding:16px;background:#fff;margin-bottom:14px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
       + '<p style="font-size:15px;font-weight:500;color:#111;margin:0;">' + (s.player_username || 'Player ' + s.player_id) + '</p>'
@@ -1130,8 +1133,8 @@ window.loadVerifySessions = async function() {
       + '<p style="font-size:12px;color:#888;margin:0 0 12px;">' + s.start_time + ' — ' + s.end_time + '</p>'
       + image
       + '<div style="display:flex;gap:8px;">'
-      + '<button onclick="submitVerification(\'' + s['Session ID'] + '\', \'' + qualifyingSession['Session ID'] + '\', \'confirmed\')" style="flex:1;padding:10px 16px;background:#2d7a3a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">✓ Confirm</button>'
-      + '<button onclick="submitVerification(\'' + s['Session ID'] + '\', \'' + qualifyingSession['Session ID'] + '\', \'disputed\')" style="flex:1;padding:10px 16px;background:#fff;color:#e24b4a;border:1px solid #e24b4a;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">✗ Dispute</button>'
+      + '<button onclick="submitVerification(\'' + s['Session ID'] + '\', \'' + s.player_id + '\', ' + s.court_id + ', \'confirmed\')" style="flex:1;padding:10px 16px;background:#2d7a3a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">✓ Confirm</button>'
+      + '<button onclick="submitVerification(\'' + s['Session ID'] + '\', \'' + s.player_id + '\', ' + s.court_id + ', \'disputed\')" style="flex:1;padding:10px 16px;background:#fff;color:#e24b4a;border:1px solid #e24b4a;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">✗ Dispute</button>'
       + '</div>'
       + '</div>';
   }).join('');
@@ -1144,7 +1147,9 @@ window.loadVerifySessions = async function() {
     + '</div>';
 };
 
-window.submitVerification = async function(sessionId, verifierSessionId, vote) {
+// FIX 2 (continued): added sessionOwnerId and courtId as parameters so they are
+// no longer read from the undefined theirSession variable
+window.submitVerification = async function(sessionId, sessionOwnerId, courtId, vote) {
   if (!currentPlayerProfileNumber) { alert('You must be logged in.'); return; }
 
   var confirmMsg = vote === 'confirmed'
@@ -1153,15 +1158,15 @@ window.submitVerification = async function(sessionId, verifierSessionId, vote) {
 
   if (!confirm(confirmMsg)) return;
 
-var result = await window._supabase
-  .from('session_validations')
-  .insert({
-    session_id: sessionId,
-    validator_player_id: currentPlayerProfileNumber,
-    session_owner_id: theirSession.player_id,
-    court_id: theirSession.court_id,
-    validation_result: vote === 'confirmed' ? 'confirmed' : 'disputed'
-  });
+  var result = await window._supabase
+    .from('session_validations')
+    .insert({
+      session_id:          sessionId,
+      validator_player_id: currentPlayerProfileNumber,
+      session_owner_id:    sessionOwnerId,
+      court_id:            courtId,
+      validation_result:   vote === 'confirmed' ? 'confirmed' : 'disputed'
+    });
 
   if (result.error) {
     console.error(result.error);

@@ -1016,17 +1016,17 @@ window.removeFriend = async function(friendId) {
 // ========================================
 // VERIFY SESSIONS
 // ========================================
-window.addEventListener('load', async function() {
+window.addEventListener('load', async function () {
   if (!document.getElementById('verify-sessions-container')) return;
 
   var player = await getCurrentPlayer();
-  currentPlayerEmail = player.email;
+  currentPlayerEmail    = player.email;
   currentPlayerProfileNumber = player.playerId;
 
   window.loadVerifySessions();
 });
 
-window.loadVerifySessions = async function() {
+window.loadVerifySessions = async function () {
   var container = document.getElementById('verify-sessions-container');
   if (!container) return;
 
@@ -1035,128 +1035,142 @@ window.loadVerifySessions = async function() {
     return;
   }
 
-  var mySessionsResult = await window._supabase
-    .from('Sessions Forms')
-    .select('"Session ID", court_id, start_time, end_time')
-    .eq('player_id', currentPlayerProfileNumber)
-    .not('end_time', 'is', null);
-
-  var mySessions = mySessionsResult.data || [];
-
-  if (mySessions.length === 0) {
-    container.innerHTML = ''
-      + '<div style="padding:0 16px;max-width:640px;margin:0 auto;">'
-      + '<h2 style="font-size:22px;font-weight:500;margin-bottom:1.25rem;color:#111;">Verify Sessions</h2>'
-      + '<p style="color:#888;font-size:14px;">You need to complete at least one session before you can verify other players\' sessions.</p>'
-      + '</div>';
-    return;
-  }
-
-  // FIX 1: was reading from 'Verifications' with 'verifier_id' — now reads from
-  // session_validations with validator_player_id (the correct table and column)
-  var myVerificationsResult = await window._supabase
-    .from('session_validations')
-    .select('session_id')
-    .eq('validator_player_id', currentPlayerProfileNumber);
-
-  var alreadyVerifiedIds = (myVerificationsResult.data || []).map(function(v) { return v.session_id; });
-
-  var courtIds = [...new Set(mySessions.map(function(s) { return s.court_id; }))];
-
-  var threeDaysAgo = new Date();
-  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-
-  var eligibleResult = await window._supabase
-    .from('Sessions Forms')
-    .select('"Session ID", player_id, player_username, court_id, start_time, end_time, "Images", "Verified? or Review?"')
-    .in('court_id', courtIds)
-    .not('end_time', 'is', null)
-    .gte('end_time', threeDaysAgo.toISOString())
-    .neq('player_id', currentPlayerProfileNumber)
-    .order('start_time', { ascending: false });
-
-  var candidateSessions = eligibleResult.data || [];
-
-  var eligibleSessions = candidateSessions.filter(function(theirSession) {
-    if (alreadyVerifiedIds.indexOf(theirSession['Session ID']) !== -1) return false;
-
-    var theirStart = new Date(theirSession.start_time);
-    var theirEnd   = new Date(theirSession.end_time);
-
-    return mySessions.some(function(mySession) {
-      if (mySession.court_id !== theirSession.court_id) return false;
-      var myStart = new Date(mySession.start_time);
-      var myEnd   = new Date(mySession.end_time);
-      return myStart < theirEnd && theirStart < myEnd;
-    });
-  });
-
-  var courtsResult = await window._supabase
-    .from('Courts')
-    .select('court_id, court_name')
-    .in('court_id', courtIds);
-
-  var courtMap = {};
-  (courtsResult.data || []).forEach(function(c) { courtMap[c.court_id] = c.court_name; });
-
-  if (eligibleSessions.length === 0) {
-    container.innerHTML = ''
-      + '<div style="padding:0 16px;max-width:640px;margin:0 auto;">'
-      + '<h2 style="font-size:22px;font-weight:500;margin-bottom:1.25rem;color:#111;">Verify Sessions</h2>'
-      + '<p style="color:#888;font-size:14px;">No sessions available for you to verify right now. Sessions appear here when you were at the same court at the same time as another player.</p>'
-      + '</div>';
-    return;
-  }
-
-  var cards = eligibleSessions.map(function(s) {
-    var qualifyingSession = mySessions.find(function(mine) {
-      if (mine.court_id !== s.court_id) return false;
-      var myStart    = new Date(mine.start_time);
-      var myEnd      = new Date(mine.end_time);
-      var theirStart = new Date(s.start_time);
-      var theirEnd   = new Date(s.end_time);
-      return myStart < theirEnd && theirStart < myEnd;
-    });
-
-    var courtName = courtMap[s.court_id] || 'Court ' + s.court_id;
-    var image = s.Images
-      ? '<img src="' + s.Images + '" style="width:100%;max-height:300px;object-fit:cover;border-radius:8px;display:block;margin-bottom:12px;" />'
-      : '';
-
-    // FIX 2: pass court_id and player_id as arguments to submitVerification so
-    // they are available in that function's scope (theirSession was undefined there)
-    return '<div style="border:1px solid #eee;border-radius:12px;padding:16px;background:#fff;margin-bottom:14px;">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-      + '<p style="font-size:15px;font-weight:500;color:#111;margin:0;">' + (s.player_username || 'Player ' + s.player_id) + '</p>'
-      + '<span style="font-size:12px;color:#888;">' + courtName + '</span>'
-      + '</div>'
-      + '<p style="font-size:12px;color:#888;margin:0 0 12px;">' + s.start_time + ' — ' + s.end_time + '</p>'
-      + image
-      + '<div style="display:flex;gap:8px;">'
-      + '<button onclick="submitVerification(\'' + s['Session ID'] + '\', \'' + s.player_id + '\', ' + s.court_id + ', \'confirmed\')" style="flex:1;padding:10px 16px;background:#2d7a3a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">✓ Confirm</button>'
-      + '<button onclick="submitVerification(\'' + s['Session ID'] + '\', \'' + s.player_id + '\', ' + s.court_id + ', \'disputed\')" style="flex:1;padding:10px 16px;background:#fff;color:#e24b4a;border:1px solid #e24b4a;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">✗ Dispute</button>'
-      + '</div>'
-      + '</div>';
-  }).join('');
-
+  // ── Loading state ──────────────────────────────────────────────────────────
   container.innerHTML = ''
     + '<div style="padding:0 16px;max-width:640px;margin:0 auto;">'
-    + '<h2 style="font-size:22px;font-weight:500;margin-bottom:8px;color:#111;">Verify Sessions</h2>'
-    + '<p style="font-size:13px;color:#888;margin-bottom:1.25rem;">These sessions overlapped with yours at the same court. Confirm if you actually saw them play, or dispute if you didn\'t.</p>'
-    + cards
+    + '<div style="display:flex;align-items:center;gap:10px;padding-top:8px;margin-bottom:8px;">'
+    + '<h2 style="font-size:22px;font-weight:500;color:#111;margin:0;">Verify Sessions</h2>'
+    + '<div id="vs-badge" style="display:none;background:#0060ff;border-radius:12px;padding:2px 10px;min-width:24px;text-align:center;">'
+    + '<span id="vs-badge-count" style="color:#fff;font-size:13px;font-weight:700;"></span>'
+    + '</div>'
+    + '</div>'
+    + '<p style="font-size:13px;color:#888;margin:0 0 1.25rem;line-height:1.5;">'
+    + 'Confirm or dispute sessions from players you ran with. You earn +5 XP when your vote matches the majority.'
+    + '</p>'
+    + '<div id="vs-list" style="display:flex;flex-direction:column;gap:14px;">'
+    + '<div style="text-align:center;padding:40px 0;color:#888;font-size:14px;">Loading sessions...</div>'
+    + '</div>'
+    + '</div>';
+
+  // ── Fetch via RPC — same call the app uses ─────────────────────────────────
+  var rpcResult = await window._supabase.rpc('get_sessions_to_verify', {
+    p_player_id: currentPlayerProfileNumber
+  });
+
+  if (rpcResult.error) {
+    console.error('get_sessions_to_verify error:', rpcResult.error);
+    document.getElementById('vs-list').innerHTML =
+      '<p style="text-align:center;color:#888;font-size:14px;padding:40px 0;">Could not load sessions. Please try again.</p>';
+    return;
+  }
+
+  var sessions = rpcResult.data || [];
+
+  window._vsSessions = sessions; // keep in memory for card removal
+
+  window.renderVerifySessions();
+};
+
+window.renderVerifySessions = function () {
+  var list = document.getElementById('vs-list');
+  if (!list) return;
+
+  var sessions = window._vsSessions || [];
+
+  // ── Update badge count ────────────────────────────────────────────────────
+  var badge      = document.getElementById('vs-badge');
+  var badgeCount = document.getElementById('vs-badge-count');
+  if (badge && badgeCount) {
+    if (sessions.length > 0) {
+      badgeCount.textContent = sessions.length;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  // ── Empty state ───────────────────────────────────────────────────────────
+  if (sessions.length === 0) {
+    list.innerHTML = ''
+      + '<div style="text-align:center;padding:60px 20px;">'
+      + '<p style="font-size:2.5rem;margin:0 0 12px;">✅</p>'
+      + '<p style="font-size:17px;font-weight:600;color:#111;margin:0 0 6px;">All caught up</p>'
+      + '<p style="font-size:14px;color:#888;line-height:1.6;margin:0;">'
+      + 'No sessions to verify right now.<br>Sessions appear here when players you ran with complete their sessions.'
+      + '</p>'
+      + '</div>';
+    return;
+  }
+
+  // ── Render cards ──────────────────────────────────────────────────────────
+  list.innerHTML = sessions.map(function (s) {
+    return window.buildVerifyCard(s);
+  }).join('');
+
+  // Wire up buttons
+  sessions.forEach(function (s) {
+    var confirmBtn = document.getElementById('vs-confirm-' + s.session_id);
+    var disputeBtn = document.getElementById('vs-dispute-' + s.session_id);
+    if (confirmBtn) confirmBtn.addEventListener('click', function () {
+      window.submitVerification(s.session_id, s.owner_player_id, s.court_id, 'confirmed');
+    });
+    if (disputeBtn) disputeBtn.addEventListener('click', function () {
+      window.submitVerification(s.session_id, s.owner_player_id, s.court_id, 'disputed');
+    });
+  });
+};
+
+// ── Build a single card (mirrors the app's renderSession) ─────────────────────
+window.buildVerifyCard = function (s) {
+  var photoHtml = s.photo_url
+    ? '<img src="' + s.photo_url + '" style="width:100%;max-height:220px;object-fit:cover;display:block;" />'
+    : '';
+
+  var windowText  = vsFormatWindowClosing(s.validation_closes_at);
+  var timeAgoText = vsFormatTimeAgo(s.start_time);
+  var duration    = vsFormatDuration(s.start_time, s.end_time);
+  var sessionTime = vsFormatSessionTime(s.start_time, s.end_time);
+
+  return ''
+    + '<div id="vs-card-' + s.session_id + '" style="border:1px solid #eee;border-radius:12px;background:#fff;overflow:hidden;">'
+    + photoHtml
+    + '<div style="padding:14px 16px;">'
+
+    // Header row: username + closing window badge
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+    + '<p style="font-size:16px;font-weight:600;color:#111;margin:0;">' + escHtml(s.owner_username || 'Player ' + s.owner_player_id) + '</p>'
+    + '<span style="background:#f5f5f5;border-radius:8px;padding:3px 10px;font-size:11px;font-weight:600;color:#555;">' + windowText + '</span>'
+    + '</div>'
+
+    // Court
+    + '<p style="font-size:13px;color:#888;margin:0 0 2px;">📍 ' + escHtml(s.court_name || 'Court ' + s.court_id) + '</p>'
+
+    // Time
+    + '<p style="font-size:12px;color:#888;margin:0 0 14px;">' + sessionTime + ' · ' + duration + ' session · ' + timeAgoText + '</p>'
+
+    // Buttons
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+    + '<button id="vs-confirm-' + s.session_id + '" style="flex:1;min-width:120px;padding:11px 12px;background:rgba(0,96,255,0.1);color:#0060ff;border:1px solid rgba(0,96,255,0.3);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">'
+    + '✓ ' + escHtml(s.owner_username || 'They') + ' was there'
+    + '</button>'
+    + '<button id="vs-dispute-' + s.session_id + '" style="flex:1;min-width:120px;padding:11px 12px;background:#fff;color:#888;border:1px solid #ddd;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">'
+    + '✕ ' + escHtml(s.owner_username || 'They') + ' wasn\'t there'
+    + '</button>'
+    + '</div>'
+
+    + '</div>'
     + '</div>';
 };
 
-// FIX 2 (continued): added sessionOwnerId and courtId as parameters so they are
-// no longer read from the undefined theirSession variable
-window.submitVerification = async function(sessionId, sessionOwnerId, courtId, vote) {
+// ── Submit — writes to session_validations, mirrors app's handleValidate ──────
+window.submitVerification = async function (sessionId, sessionOwnerId, courtId, vote) {
   if (!currentPlayerProfileNumber) { alert('You must be logged in.'); return; }
 
-  var confirmMsg = vote === 'confirmed'
-    ? 'Confirm you saw this player at this session?'
-    : 'Dispute this session? This should only be used if you were there and did NOT see this player.';
-
-  if (!confirm(confirmMsg)) return;
+  // Disable both buttons immediately (prevent double-tap)
+  var confirmBtn = document.getElementById('vs-confirm-' + sessionId);
+  var disputeBtn = document.getElementById('vs-dispute-' + sessionId);
+  if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.style.opacity = '0.4'; }
+  if (disputeBtn) { disputeBtn.disabled = true; disputeBtn.style.opacity = '0.4'; }
 
   var result = await window._supabase
     .from('session_validations')
@@ -1165,17 +1179,123 @@ window.submitVerification = async function(sessionId, sessionOwnerId, courtId, v
       validator_player_id: currentPlayerProfileNumber,
       session_owner_id:    sessionOwnerId,
       court_id:            courtId,
-      validation_result:   vote === 'confirmed' ? 'confirmed' : 'disputed'
+      validation_result:   vote
     });
 
   if (result.error) {
-    console.error(result.error);
-    alert('Error submitting verification. Please try again.');
+    console.error('Validation insert error:', result.error);
+
+    // 23505 = unique constraint — already validated; remove card silently (same as app)
+    if (result.error.code === '23505') {
+      vsRemoveCard(sessionId);
+      vsShowToast('Already validated');
+      return;
+    }
+
+    // Re-enable buttons on other errors
+    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.style.opacity = '1'; }
+    if (disputeBtn) { disputeBtn.disabled = false; disputeBtn.style.opacity = '1'; }
+    vsShowToast('Error submitting — please try again');
     return;
   }
 
-  window.loadVerifySessions();
+  // Success — remove card from list
+  vsRemoveCard(sessionId);
+  vsShowToast('Validation submitted! +5 XP if your vote matches the majority.');
 };
+
+// ── Remove a card from in-memory list and re-render ───────────────────────────
+function vsRemoveCard(sessionId) {
+  window._vsSessions = (window._vsSessions || []).filter(function (s) {
+    return s.session_id !== sessionId;
+  });
+  // Animate card out, then re-render
+  var card = document.getElementById('vs-card-' + sessionId);
+  if (card) {
+    card.style.transition = 'opacity 0.25s';
+    card.style.opacity = '0';
+    setTimeout(function () { window.renderVerifySessions(); }, 260);
+  } else {
+    window.renderVerifySessions();
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function vsShowToast(msg) {
+  var existing = document.getElementById('vs-toast');
+  if (existing) existing.remove();
+
+  var toast = document.createElement('div');
+  toast.id = 'vs-toast';
+  toast.textContent = msg;
+  toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);'
+    + 'background:#111;color:#fff;padding:12px 22px;border-radius:8px;font-size:14px;'
+    + 'font-family:inherit;z-index:9999;white-space:nowrap;max-width:calc(100vw - 48px);'
+    + 'text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);'
+    + 'opacity:0;transition:opacity 0.2s;';
+  document.body.appendChild(toast);
+  requestAnimationFrame(function () { toast.style.opacity = '1'; });
+  setTimeout(function () {
+    toast.style.opacity = '0';
+    setTimeout(function () { toast.remove(); }, 220);
+  }, 2800);
+}
+
+// ── Time/date helpers (mirrors app formatters) ────────────────────────────────
+function vsFormatWindowClosing(isoString) {
+  if (!isoString) return 'Window closing';
+  var diff  = new Date(isoString).getTime() - Date.now();
+  var hours = Math.floor(diff / (1000 * 60 * 60));
+  if (hours < 1)  return 'Closes in < 1h';
+  if (hours < 24) return 'Closes in ' + hours + 'h';
+  return 'Closes in ' + Math.floor(hours / 24) + 'd';
+}
+
+function vsFormatTimeAgo(isoString) {
+  var diff  = Date.now() - new Date(isoString).getTime();
+  var hours = Math.floor(diff / (1000 * 60 * 60));
+  if (hours < 1)  return 'Less than an hour ago';
+  if (hours < 24) return hours + 'h ago';
+  return Math.floor(hours / 24) + 'd ago';
+}
+
+function vsFormatDuration(start, end) {
+  var diff = new Date(end).getTime() - new Date(start).getTime();
+  var mins = Math.floor(diff / (1000 * 60));
+  if (mins < 60) return mins + 'm';
+  var h = Math.floor(mins / 60);
+  var m = mins % 60;
+  return m > 0 ? h + 'h ' + m + 'm' : h + 'h';
+}
+
+function vsFormatSessionTime(start, end) {
+  var opts = { hour: 'numeric', minute: '2-digit', hour12: true };
+  var startDate = new Date(start);
+  var endDate   = new Date(end);
+  var now       = new Date();
+
+  var isToday     = startDate.toDateString() === now.toDateString();
+  var yesterday   = new Date(now); yesterday.setDate(now.getDate() - 1);
+  var isYesterday = startDate.toDateString() === yesterday.toDateString();
+
+  var dayLabel = isToday     ? 'Today'
+               : isYesterday ? 'Yesterday'
+               : startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  return dayLabel + ', '
+    + startDate.toLocaleTimeString('en-US', opts)
+    + ' – '
+    + endDate.toLocaleTimeString('en-US', opts);
+}
+
+// ── XSS guard ─────────────────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 
 

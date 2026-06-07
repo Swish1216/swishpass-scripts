@@ -3784,9 +3784,11 @@ var playerNumber = parseInt(urlParams.get('player_profile_number'), 10);
     return;
   }
 
-  var result = await window._supabase
+var result = await window._supabase
     .from('Players')
     .select('"Username", "XP", "Tier", "State/Province", "Country", "Position", "Top Skill", "Favorite Player", "Profile Photo URL", "Created", "MVP Count", "Session Totals", "Ranking", "Legacy Points"')
+    .eq('player_id', playerNumber)
+    .single();
 
   if (result.error || !result.data) {
     document.getElementById('player-username').textContent = 'Player not found.';

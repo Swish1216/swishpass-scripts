@@ -326,21 +326,42 @@ window.loadBadges = async function() {
   var data = result.data;
   var error = result.error;
   if (error) { console.error(error); return; }
-  var items = data.map(function(b) {
-    return '<div style="display:flex;align-items:flex-start;gap:16px;padding:16px;border-bottom:1px solid #f0f0f0;">'
-      + '<a href="' + (b.URL || '#') + '" target="_blank" style="flex-shrink:0;">'
-      + '<img src="' + (b['Badge Image URL'] || '') + '" alt="' + b.Name + '" style="width:64px;height:64px;object-fit:contain;border-radius:8px;background:#f5f5f5;" />'
-      + '</a>'
-      + '<div style="flex:1;">'
-      + '<p style="font-size:15px;font-weight:500;color:#111;margin:0 0 4px;">' + b.Name + '</p>'
-      + '<p style="font-size:13px;color:#555;margin:0 0 6px;">' + (b.Notes || '') + '</p>'
-      + '<p style="font-size:12px;color:#888;margin:0 0 2px;">Start: ' + (b['Start Date'] || 'N/A') + '</p>'
-      + '<p style="font-size:12px;color:#888;margin:0 0 2px;">End: ' + (b['End Date'] || 'N/A') + '</p>'
-      + '<p style="font-size:12px;color:#888;margin:0;">Season: ' + (b.Season || 'N/A') + '</p>'
-      + '</div>'
-      + '<a href="' + (b.URL || '#') + '" target="_blank" style="font-size:12px;color:#555;text-decoration:none;white-space:nowrap;align-self:center;padding:6px 12px;border:1px solid #ddd;border-radius:6px;">View →</a>'
-      + '</div>';
-  }).join('');
+var items = data.map(function(b) {
+  var badgeId = 'badge-' + (b['Badge #'] || Math.random());
+  return '<div style="display:flex;align-items:flex-start;gap:16px;padding:16px;border-bottom:1px solid #f0f0f0;">'
+    + '<img src="' + (b['Badge Image URL'] || '') + '" alt="' + b.Name + '" style="width:64px;height:64px;object-fit:contain;border-radius:8px;background:#f5f5f5;flex-shrink:0;" />'
+    + '<div style="flex:1;">'
+    + '<p style="font-size:15px;font-weight:500;color:#111;margin:0 0 4px;">' + b.Name + '</p>'
+    + '<p style="font-size:13px;color:#555;margin:0 0 6px;">' + (b.Notes || '') + '</p>'
+    + '<p style="font-size:12px;color:#888;margin:0 0 2px;">Start: ' + (b['Start Date'] || 'N/A') + '</p>'
+    + '<p style="font-size:12px;color:#888;margin:0 0 2px;">End: ' + (b['End Date'] || 'N/A') + '</p>'
+    + '<p style="font-size:12px;color:#888;margin:0;">Season: ' + (b.Season || 'N/A') + '</p>'
+    + '</div>'
+    + '<button onclick="showBadgeModal(' + JSON.stringify(b).replace(/'/g, "\\'") + ')" style="font-size:12px;color:#555;cursor:pointer;white-space:nowrap;align-self:center;padding:6px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;">View →</button>'
+    + '</div>';
+}).join('');
+
+  window.showBadgeModal = function(b) {
+  var existing = document.getElementById('badge-modal-overlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'badge-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;';
+  overlay.innerHTML = ''
+    + '<div style="background:#fff;border-radius:16px;max-width:380px;width:100%;padding:28px;text-align:center;position:relative;">'
+    + '<button onclick="document.getElementById(\'badge-modal-overlay\').remove()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#888;">×</button>'
+    + '<img src="' + (b['Badge Image URL'] || '') + '" style="width:120px;height:120px;object-fit:contain;border-radius:12px;background:#f5f5f5;margin-bottom:16px;" />'
+    + '<h3 style="font-size:18px;font-weight:600;color:#111;margin:0 0 8px;">' + b.Name + '</h3>'
+    + '<p style="font-size:14px;color:#555;margin:0 0 16px;line-height:1.5;">' + (b.Notes || '') + '</p>'
+    + '<p style="font-size:12px;color:#888;margin:0;">Season: ' + (b.Season || 'N/A') + ' · ' + (b['Start Date'] || '') + ' – ' + (b['End Date'] || '') + '</p>'
+    + '</div>';
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.body.appendChild(overlay);
+};
+  
   container.innerHTML = ''
     + '<div style="padding:0 16px;">'
     + '<h2 style="font-size:22px;font-weight:500;margin-bottom:1.25rem;color:#111;">Badges</h2>'
@@ -587,6 +608,8 @@ window.initSocialFeed = function() {
     + '<div id="social-feed-end" style="text-align:center;padding:20px;color:#888;font-size:14px;display:none;">You\'ve reached the end</div>'
     + '</div>';
 
+  
+
   window.loadMoreSocialFeed();
 
   window.addEventListener('scroll', function() {
@@ -640,7 +663,7 @@ window.loadMoreSocialFeed = async function() {
       + '</div>'
       + '<div style="padding:16px 18px;">'
       + '<div style="display:flex;justify-content:space-between;margin-bottom:10px;">'
-      + '<span style="font-size:12px;color:#888;">' + (post.Date || 'N/A') + '</span>'
+      + '<span style="font-size:12px;color:#888;">' + (post.Date ? formatPostTime(post.Date) : 'N/A') + '</span>'
       + '<span style="font-size:12px;color:#888;">' + (post['Court Name'] || 'N/A') + '</span>'
       + '</div>'
       + (post.Post ? '<p style="font-size:15px;color:#111;margin:0 0 14px;line-height:1.5;">' + post.Post + '</p>' : '')
@@ -2487,6 +2510,36 @@ async function initProfileSetup() {
     </div>
   `;
   injectPopStyles();
+
+  window._supabase
+  .from('Players')
+  .select('"Position", "Top Skill", "Favorite Player", "Profile Photo URL"')
+  .eq(AUTH_LINK_COLUMN, user.id)
+  .single()
+  .then(function(result) {
+    if (!result.data) return;
+    var d = result.data;
+    if (d.Position) {
+      var pos = document.getElementById('position-select');
+      if (pos) pos.value = d.Position;
+    }
+    if (d['Top Skill']) {
+      var skill = document.getElementById('skill-select');
+      if (skill) skill.value = d['Top Skill'];
+    }
+    if (d['Favorite Player']) {
+      var fav = document.getElementById('favorite-player-input');
+      if (fav) fav.value = d['Favorite Player'];
+    }
+    if (d['Profile Photo URL']) {
+      var preview = document.getElementById('photo-preview');
+      var storage = document.getElementById('photo-url-storage');
+      var btn = document.getElementById('photo-upload-btn');
+      if (preview) { preview.src = d['Profile Photo URL']; preview.style.display = 'block'; }
+      if (storage) storage.textContent = d['Profile Photo URL'];
+      if (btn) btn.textContent = 'Change Photo';
+    }
+  });
 
   const positionSelect = document.getElementById("position-select");
   const skillSelect = document.getElementById("skill-select");

@@ -266,8 +266,12 @@ var result = await window._supabase
     .from('Players')
     .select('"Country", "State/Province"');
   var allData = allResult.data || [];
-  var countries = [...new Set(allData.map(function(p) { return p.Country; }).filter(Boolean))].sort();
-  var states = [...new Set(allData.map(function(p) { return p['State/Province']; }).filter(Boolean))].sort();
+var countries = [...new Set(allData.map(function(p) { return p.Country; }).filter(function(c) {
+  return c && c !== 'N/A' && c.trim() !== '';
+}))].sort();
+var states = [...new Set(allData.map(function(p) { return p['State/Province']; }).filter(function(s) {
+  return s && s !== 'N/A' && s.trim() !== '';
+}))].sort();
   var rows = data.map(function(p, i) {
     return '<tr style="border-bottom:1px solid #f5f5f5;">'
       + '<td style="padding:12px 14px;color:#888;">' + (i + 1) + '</td>'
@@ -326,22 +330,31 @@ window.loadBadges = async function() {
   var data = result.data;
   var error = result.error;
   if (error) { console.error(error); return; }
-var items = data.map(function(b) {
-  var badgeId = 'badge-' + (b['Badge #'] || Math.random());
-  return '<div style="display:flex;align-items:flex-start;gap:16px;padding:16px;border-bottom:1px solid #f0f0f0;">'
-    + '<img src="' + (b['Badge Image URL'] || '') + '" alt="' + b.Name + '" style="width:64px;height:64px;object-fit:contain;border-radius:8px;background:#f5f5f5;flex-shrink:0;" />'
-    + '<div style="flex:1;">'
-    + '<p style="font-size:15px;font-weight:500;color:#111;margin:0 0 4px;">' + b.Name + '</p>'
-    + '<p style="font-size:13px;color:#555;margin:0 0 6px;">' + (b.Notes || '') + '</p>'
-    + '<p style="font-size:12px;color:#888;margin:0 0 2px;">Start: ' + (b['Start Date'] || 'N/A') + '</p>'
-    + '<p style="font-size:12px;color:#888;margin:0 0 2px;">End: ' + (b['End Date'] || 'N/A') + '</p>'
-    + '<p style="font-size:12px;color:#888;margin:0;">Season: ' + (b.Season || 'N/A') + '</p>'
-    + '</div>'
-    + '<button onclick="showBadgeModal(' + JSON.stringify(b).replace(/'/g, "\\'") + ')" style="font-size:12px;color:#555;cursor:pointer;white-space:nowrap;align-self:center;padding:6px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;">View →</button>'
-    + '</div>';
-}).join('');
+  var items = data.map(function(b) {
+    var badgeId = 'badge-' + (b['Badge #'] || Math.random());
+    return '<div style="display:flex;align-items:flex-start;gap:16px;padding:16px;border-bottom:1px solid #f0f0f0;">'
+      + '<img src="' + (b['Badge Image URL'] || '') + '" alt="' + b.Name + '" style="width:64px;height:64px;object-fit:contain;border-radius:8px;background:#f5f5f5;flex-shrink:0;" />'
+      + '<div style="flex:1;">'
+      + '<p style="font-size:15px;font-weight:500;color:#111;margin:0 0 4px;">' + b.Name + '</p>'
+      + '<p style="font-size:13px;color:#555;margin:0 0 6px;">' + (b.Notes || '') + '</p>'
+      + '<p style="font-size:12px;color:#888;margin:0 0 2px;">Start: ' + (b['Start Date'] || 'N/A') + '</p>'
+      + '<p style="font-size:12px;color:#888;margin:0 0 2px;">End: ' + (b['End Date'] || 'N/A') + '</p>'
+      + '<p style="font-size:12px;color:#888;margin:0;">Season: ' + (b.Season || 'N/A') + '</p>'
+      + '</div>'
+      + '<button onclick="showBadgeModal(' + JSON.stringify(b).replace(/'/g, "\\'") + ')" style="font-size:12px;color:#555;cursor:pointer;white-space:nowrap;align-self:center;padding:6px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;">View →</button>'
+      + '</div>';
+  }).join('');
 
-  window.showBadgeModal = function(b) {
+  container.innerHTML = ''
+    + '<div style="padding:0 16px;">'
+    + '<h2 style="font-size:22px;font-weight:500;margin-bottom:1.25rem;color:#111;">Badges</h2>'
+    + '<div style="background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">'
+    + (items || '<p style="padding:2rem;text-align:center;color:#888;">No badges found</p>')
+    + '</div>'
+    + '</div>';
+};
+
+window.showBadgeModal = function(b) {
   var existing = document.getElementById('badge-modal-overlay');
   if (existing) existing.remove();
 
@@ -360,15 +373,6 @@ var items = data.map(function(b) {
     if (e.target === overlay) overlay.remove();
   });
   document.body.appendChild(overlay);
-};
-  
-  container.innerHTML = ''
-    + '<div style="padding:0 16px;">'
-    + '<h2 style="font-size:22px;font-weight:500;margin-bottom:1.25rem;color:#111;">Badges</h2>'
-    + '<div style="background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">'
-    + (items || '<p style="padding:2rem;text-align:center;color:#888;">No badges found</p>')
-    + '</div>'
-    + '</div>';
 };
 
 
@@ -573,7 +577,17 @@ window.addEventListener('load', function() {
   });
 });
 
-
+function formatPostTime(isoString) {
+  var d = new Date(isoString);
+  var now = new Date();
+  var diffMs = now - d;
+  var diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  var diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffHours < 1) return 'Just now';
+  if (diffHours < 24) return diffHours + 'h ago';
+  if (diffDays < 7) return diffDays + 'd ago';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 // ========================================
 // SOCIAL FEED
@@ -607,8 +621,6 @@ window.initSocialFeed = function() {
     + '<div id="social-feed-loader" style="text-align:center;padding:20px;color:#888;font-size:14px;">Loading more posts...</div>'
     + '<div id="social-feed-end" style="text-align:center;padding:20px;color:#888;font-size:14px;display:none;">You\'ve reached the end</div>'
     + '</div>';
-
-  
 
   window.loadMoreSocialFeed();
 
@@ -793,7 +805,7 @@ window.searchPlayers = function() {
         : '<div style="width:48px;height:48px;border-radius:50%;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#888;font-size:14px;font-weight:500;flex-shrink:0;">' + (p.Username ? p.Username.charAt(0).toUpperCase() : '?') + '</div>';
 
       var addFriendBtn = currentPlayerProfileNumber
-        ? '<button onclick="event.preventDefault();event.stopPropagation();sendFriendRequest(' + p.player_id + ', \'' + (p.Username || '') + '\', this)" style="padding:8px 14px;background:#378add;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;white-space:nowrap;">Add Friend</button>'
+        ? '<button onclick="event.preventDefault();event.stopPropagation();sendFriendRequest(' + p.player_id + ', \'' + (p.Username || '') + '\', this)" style="padding:8px 14px;background:#FF5000;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;white-space:nowrap;">Add Friend</button>'
         : '';
 
       return '<div style="display:flex;align-items:center;gap:14px;padding:12px 16px;border:1px solid #eee;border-radius:10px;background:#fff;">'
@@ -1546,7 +1558,7 @@ window.loadMoreSFPlayer = async function() {
       + '</div>'
       + '<div style="padding:16px 18px;">'
       + '<div style="display:flex;justify-content:space-between;margin-bottom:10px;">'
-      + '<span style="font-size:12px;color:#888;">' + (post.Date || 'N/A') + '</span>'
+      + '<span style="font-size:12px;color:#888;">' + (post.Date ? formatPostTime(post.Date) : 'N/A') + '</span>'
       + '<span style="font-size:12px;color:#888;">' + (post['Court Name'] || 'N/A') + '</span>'
       + '</div>'
       + (post.Post ? '<p style="font-size:15px;color:#111;margin:0;line-height:1.5;">' + post.Post + '</p>' : '')
@@ -2101,7 +2113,7 @@ window.loadSFGroup = async function(groupNumber) {
       + '</div>'
       + '<div style="padding:16px 18px;">'
       + '<div style="display:flex;justify-content:space-between;margin-bottom:10px;">'
-      + '<span style="font-size:12px;color:#888;">' + (post.Date || 'N/A') + '</span>'
+      + '<span style="font-size:12px;color:#888;">' + (post.Date ? formatPostTime(post.Date) : 'N/A') + '</span>'
       + '<span style="font-size:12px;color:#888;">' + (post['Court Name'] || 'N/A') + '</span>'
       + '</div>'
       + (post.Post ? '<p style="font-size:15px;color:#111;margin:0;line-height:1.5;">' + post.Post + '</p>' : '')
@@ -2671,7 +2683,7 @@ function injectPopStyles() {
       padding: 14px;
       font-size: 16px;
       font-weight: 600;
-      background: #000;
+background: #FF5000;
       color: #fff;
       border: none;
       border-radius: 8px;

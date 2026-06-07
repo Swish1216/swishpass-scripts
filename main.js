@@ -3767,6 +3767,14 @@ options: { emailRedirectTo: 'https://swishpass.webflow.io/sign-in' }
 // ========================================
 window.addEventListener('load', async function () {
   if (!document.getElementById('player-username')) return;
+  await new Promise(function(resolve) {
+    var check = setInterval(function() {
+      window._supabase.auth.getSession().then(function(r) {
+        if (r.data.session) { clearInterval(check); resolve(); }
+      });
+    }, 200);
+    setTimeout(function() { clearInterval(check); resolve(); }, 3000);
+  });
 
   var urlParams = new URLSearchParams(window.location.search);
 var playerNumber = parseInt(urlParams.get('player_profile_number'), 10);
@@ -3797,8 +3805,8 @@ var playerNumber = parseInt(urlParams.get('player_profile_number'), 10);
   var xpEl = document.getElementById('player-xp');
   if (xpEl) xpEl.textContent = p.XP || 0;
 
-  var rankingEl = document.getElementById('player-ranking');
-  if (rankingEl) rankingEl.textContent = p.Ranking || 'N/A';
+var rankingEl = document.getElementById('player-tier');
+  if (rankingEl) rankingEl.textContent = (p.Tier || 'N/A') + ' · #' + (p.Ranking || 'N/A');
 
   // Location
   var countryEl = document.getElementById('player-country');
@@ -3823,14 +3831,8 @@ var playerNumber = parseInt(urlParams.get('player_profile_number'), 10);
     : 'N/A';
 
   // Stats
-  var mvpEl = document.getElementById('player-mvp-count');
+var mvpEl = document.getElementById('player-mvp-count');
   if (mvpEl) mvpEl.textContent = p['MVP Count'] || 0;
-
-  var sessionsEl = document.getElementById('player-session-totals');
-  if (sessionsEl) sessionsEl.textContent = p['Session Totals'] || 0;
-
-  var legacyEl = document.getElementById('player-legacy-points');
-  if (legacyEl) legacyEl.textContent = (p['Legacy Points'] || 0).toLocaleString();
 
   // Photos
   var photoEl = document.getElementById('player-profile-photo');

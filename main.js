@@ -1441,6 +1441,7 @@ window.addEventListener('load', function() {
 
   var urlParams = new URLSearchParams(window.location.search);
   sfPlayerTargetId = urlParams.get('player_profile_number');
+   if (!sfPlayerTargetId && window.location.pathname === '/profile') return; // handled by personal profile loader
 
   if (!sfPlayerTargetId) {
     var personalDiv = document.getElementById('personal-player-number');
@@ -1556,6 +1557,7 @@ window.addEventListener('load', function() {
 
   var urlParams = new URLSearchParams(window.location.search);
   badgesEarnedPlayerTargetId = urlParams.get('player_profile_number');
+  if (!badgesEarnedPlayerTargetId && window.location.pathname === '/profile') return; // handled by personal profile loader
 
   if (!badgesEarnedPlayerTargetId) {
     var personalDiv = document.getElementById('personal-player-number');
@@ -3702,7 +3704,7 @@ window.addEventListener('load', async function () {
   if (!document.getElementById('player-username')) return;
 
   var urlParams = new URLSearchParams(window.location.search);
-  var playerNumber = urlParams.get('player_profile_number');
+var playerNumber = parseInt(urlParams.get('player_profile_number'), 10);
 
   if (!playerNumber) {
     document.getElementById('player-username').textContent = 'No player specified.';

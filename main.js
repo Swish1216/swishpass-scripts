@@ -3778,9 +3778,7 @@ var playerNumber = parseInt(urlParams.get('player_profile_number'), 10);
 
   var result = await window._supabase
     .from('Players')
-    .select('"Username", "XP", "Tier", "State/Province", "Country", "Position", "Top Skill", "Favorite Player", "Profile Photo URL", "Badge Image URL", "Created", "MVP Count", "Session Totals", "Ranking", "Legacy Points"')
-    .eq('player_id', playerNumber)
-    .single();
+    .select('"Username", "XP", "Tier", "State/Province", "Country", "Position", "Top Skill", "Favorite Player", "Profile Photo URL", "Created", "MVP Count", "Session Totals", "Ranking", "Legacy Points"')
 
   if (result.error || !result.data) {
     document.getElementById('player-username').textContent = 'Player not found.';
@@ -3839,7 +3837,6 @@ var playerNumber = parseInt(urlParams.get('player_profile_number'), 10);
   if (photoEl && p['Profile Photo URL']) photoEl.src = p['Profile Photo URL'];
 
   var badgeEl = document.getElementById('player-badge-image');
-  if (badgeEl && p['Badge Image URL']) badgeEl.src = p['Badge Image URL'];
 
   // Friend/report buttons — only show if viewing someone else's profile
   var currentPlayer = await getCurrentPlayer();
@@ -3865,7 +3862,7 @@ window.addEventListener('load', async function () {
 
   var result = await window._supabase
     .from('Players')
-    .select('"Username", "XP", "Tier", "State/Province", "Country", "Position", "Top Skill", "Favorite Player", "Profile Photo URL", "Badge Image URL", "Created", "MVP Count", "Session Totals", "Ranking", "Legacy Points", "player_id"')
+    .select('"Username", "XP", "Tier", "State/Province", "Country", "Position", "Top Skill", "Favorite Player", "Profile Photo URL", "Created", "MVP Count", "Session Totals", "Ranking", "Legacy Points", "player_id"')
     .eq('player_id', player.playerId)
     .single();
 

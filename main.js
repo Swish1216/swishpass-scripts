@@ -364,7 +364,7 @@ window.showBadgeModal = function(btnOrData) {
   overlay.innerHTML = ''
     + '<div style="background:#fff;border-radius:16px;max-width:380px;width:100%;padding:28px;text-align:center;position:relative;">'
     + '<button onclick="document.getElementById(\'badge-modal-overlay\').remove()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#888;">×</button>'
-+ '<img src="' + (b['Badge Image URL'] || '') + '" style="width:180px;height:180px;object-fit:contain;border-radius:12px;background:#f5f5f5;margin-bottom:16px;" />'
++ '<img src="' + (b['Badge Image URL'] || '') + '" style="width:360px;height:360px;object-fit:contain;border-radius:12px;background:#f5f5f5;margin-bottom:16px;" />'
     + '<h3 style="font-size:18px;font-weight:600;color:#111;margin:0 0 8px;">' + escHtml(b.Name || '') + '</h3>'
     + '<p style="font-size:14px;color:#555;margin:0 0 16px;line-height:1.5;">' + escHtml(b.Notes || '') + '</p>'
     + '<p style="font-size:12px;color:#888;margin:0;">Season: ' + escHtml(b.Season || 'N/A') + ' · ' + escHtml(b['Start Date'] || '') + ' – ' + escHtml(b['End Date'] || '') + '</p>'

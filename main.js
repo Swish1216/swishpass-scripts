@@ -341,7 +341,7 @@ window.loadBadges = async function() {
       + '<p style="font-size:12px;color:#888;margin:0 0 2px;">End: ' + (b['End Date'] || 'N/A') + '</p>'
       + '<p style="font-size:12px;color:#888;margin:0;">Season: ' + (b.Season || 'N/A') + '</p>'
       + '</div>'
-      + '<button onclick="showBadgeModal(' + JSON.stringify(b).replace(/'/g, "\\'") + ')" style="font-size:12px;color:#555;cursor:pointer;white-space:nowrap;align-self:center;padding:6px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;">View →</button>'
++ '<button onclick="showBadgeModal(this)" data-badge=\'' + JSON.stringify(b).replace(/'/g, '&#39;') + '\' style="font-size:12px;color:#555;cursor:pointer;white-space:nowrap;align-self:center;padding:6px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;">View →</button>'
       + '</div>';
   }).join('');
 
@@ -354,10 +354,10 @@ window.loadBadges = async function() {
     + '</div>';
 };
 
-window.showBadgeModal = function(b) {
+window.showBadgeModal = function(btnOrData) {
+  var b = (btnOrData && btnOrData.dataset) ? JSON.parse(btnOrData.dataset.badge) : btnOrData;
   var existing = document.getElementById('badge-modal-overlay');
   if (existing) existing.remove();
-
   var overlay = document.createElement('div');
   overlay.id = 'badge-modal-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;';
@@ -365,13 +365,11 @@ window.showBadgeModal = function(b) {
     + '<div style="background:#fff;border-radius:16px;max-width:380px;width:100%;padding:28px;text-align:center;position:relative;">'
     + '<button onclick="document.getElementById(\'badge-modal-overlay\').remove()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#888;">×</button>'
     + '<img src="' + (b['Badge Image URL'] || '') + '" style="width:120px;height:120px;object-fit:contain;border-radius:12px;background:#f5f5f5;margin-bottom:16px;" />'
-    + '<h3 style="font-size:18px;font-weight:600;color:#111;margin:0 0 8px;">' + b.Name + '</h3>'
-    + '<p style="font-size:14px;color:#555;margin:0 0 16px;line-height:1.5;">' + (b.Notes || '') + '</p>'
-    + '<p style="font-size:12px;color:#888;margin:0;">Season: ' + (b.Season || 'N/A') + ' · ' + (b['Start Date'] || '') + ' – ' + (b['End Date'] || '') + '</p>'
+    + '<h3 style="font-size:18px;font-weight:600;color:#111;margin:0 0 8px;">' + escHtml(b.Name || '') + '</h3>'
+    + '<p style="font-size:14px;color:#555;margin:0 0 16px;line-height:1.5;">' + escHtml(b.Notes || '') + '</p>'
+    + '<p style="font-size:12px;color:#888;margin:0;">Season: ' + escHtml(b.Season || 'N/A') + ' · ' + escHtml(b['Start Date'] || '') + ' – ' + escHtml(b['End Date'] || '') + '</p>'
     + '</div>';
-  overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) overlay.remove();
-  });
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
 };
 
@@ -1158,7 +1156,7 @@ window.renderVerifySessions = function () {
 // ── Build a single card (mirrors the app's renderSession) ─────────────────────
 window.buildVerifyCard = function (s) {
   var photoHtml = s.photo_url
-    ? '<img src="' + s.photo_url + '" style="width:100%;max-height:220px;object-fit:cover;display:block;" />'
+    ? '<img src="' + s.photo_url + '" onclick="vsShowPhotoModal(\'' + s.photo_url + '\')" style="width:100%;max-height:220px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
     : '';
 
   var windowText  = vsFormatWindowClosing(s.validation_closes_at);
@@ -1253,6 +1251,17 @@ function vsRemoveCard(sessionId) {
   } else {
     window.renderVerifySessions();
   }
+}
+// ── Photo zoom modal ──────────────────────────────────────────────────────────
+function vsShowPhotoModal(url) {
+  var existing = document.getElementById('vs-photo-modal');
+  if (existing) existing.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'vs-photo-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;cursor:pointer;';
+  overlay.innerHTML = '<img src="' + url + '" style="max-width:100%;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.5);" />';
+  overlay.addEventListener('click', function() { overlay.remove(); });
+  document.body.appendChild(overlay);
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -1549,8 +1558,15 @@ window.loadMoreSFPlayer = async function() {
     return;
   }
 
-  var postsContainer = document.getElementById('sf-player-posts');
+var postsContainer = document.getElementById('sf-player-posts');
   var newPosts = data.map(function(post) {
+    var isOwner = currentPlayerProfileNumber && post.player_id == currentPlayerProfileNumber;
+    var reportBtn = !isOwner && currentPlayerProfileNumber
+      ? '<button onclick="reportPost(\'' + post['Feed Posts'] + '\')" style="padding:8px 16px;background:#378add;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">Report Post</button>'
+      : '';
+    var deleteBtn = isOwner
+      ? '<button onclick="deletePost(\'' + post['Feed Posts'] + '\')" style="padding:8px 16px;background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">Delete Post</button>'
+      : '';
     return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
       + '<div style="position:relative;">'
       + '<img src="' + (post.Attachments || '') + '" style="width:100%;max-height:500px;object-fit:cover;display:block;" />'
@@ -1561,7 +1577,8 @@ window.loadMoreSFPlayer = async function() {
       + '<span style="font-size:12px;color:#888;">' + (post.Date ? formatPostTime(post.Date) : 'N/A') + '</span>'
       + '<span style="font-size:12px;color:#888;">' + (post['Court Name'] || 'N/A') + '</span>'
       + '</div>'
-      + (post.Post ? '<p style="font-size:15px;color:#111;margin:0;line-height:1.5;">' + post.Post + '</p>' : '')
+      + (post.Post ? '<p style="font-size:15px;color:#111;margin:0 0 14px;line-height:1.5;">' + post.Post + '</p>' : '')
+      + (reportBtn || deleteBtn ? '<div style="display:flex;gap:8px;">' + reportBtn + deleteBtn + '</div>' : '')
       + '</div>'
       + '</div>';
   }).join('');

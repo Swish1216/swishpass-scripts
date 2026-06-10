@@ -244,7 +244,7 @@ window.loadLeaderboard = async function() {
   var country = document.getElementById('lb-country') ? document.getElementById('lb-country').value : '';
   var state = document.getElementById('lb-state') ? document.getElementById('lb-state').value : '';
 var result = await window._supabase
-    .from('Players')
+    .from('public_players')
     .select('"Username", "Tier", "XP", "State/Province", "Country"')
     .eq('status', 'active')
     .order('"XP"', { ascending: false });
@@ -263,7 +263,7 @@ var result = await window._supabase
     data = data.filter(function(p) { return p['State/Province'] === state; });
   }
   var allResult = await window._supabase
-    .from('Players')
+    .from('public_players')
     .select('"Country", "State/Province"');
   var allData = allResult.data || [];
 var countries = [...new Set(allData.map(function(p) { return p.Country; }).filter(function(c) {
@@ -774,7 +774,7 @@ window.searchPlayers = function() {
     var query = input ? input.value.trim() : '';
 
     var request = window._supabase
-      .from('Players')
+      .from('public_players')
       .select('"player_id", "Username", "Tier", "State/Province", "Country", "Profile Photo URL"')
       .order('"Username"', { ascending: true })
       .limit(50);
@@ -898,7 +898,7 @@ window.loadFriendsDashboard = async function() {
   var requesterMap = {};
   if (requesterIds.length > 0) {
     var requestersResult = await window._supabase
-      .from('Players')
+      .from('public_players')
       .select('"player_id", "Username", "Tier", "State/Province", "Country", "Profile Photo URL"')
       .in('player_id', requesterIds);
     (requestersResult.data || []).forEach(function(p) { requesterMap[p.player_id] = p; });
@@ -917,7 +917,7 @@ window.loadFriendsDashboard = async function() {
   var friendsMap = {};
   if (friendIds.length > 0) {
     var friendsResult = await window._supabase
-      .from('Players')
+      .from('public_players')
       .select('"player_id", "Username", "Tier", "State/Province", "Country", "Profile Photo URL"')
       .in('player_id', friendIds);
     (friendsResult.data || []).forEach(function(p) { friendsMap[p.player_id] = p; });
@@ -1731,7 +1731,7 @@ window.loadFriendsLeaderboard = async function() {
   var playerIds = friendIds.concat([currentPlayerProfileNumber]);
 
   var playersResult = await window._supabase
-    .from('Players')
+    .from('public_players')
     .select('"player_id", "Username", "Tier", "XP", "State/Province", "Country"')
     .in('player_id', playerIds)
     .eq('status', 'active')
@@ -1846,7 +1846,7 @@ window.loadGroupLeaderboardData = async function() {
   var creatorMap = {};
   if (creatorIds.length > 0) {
     var creatorsResult = await window._supabase
-      .from('Players')
+      .from('public_players')
       .select('"player_id", "Username"')
       .in('player_id', creatorIds);
     (creatorsResult.data || []).forEach(function(p) { creatorMap[p.player_id] = p.Username; });
@@ -1975,7 +1975,7 @@ var groupId = groupResult.data[0].id;
   }
 
   var playersResult = await window._supabase
-    .from('Players')
+    .from('public_players')
     .select('"player_id", "Username", "Tier", "XP", "State/Province", "Country"')
     .in('player_id', memberIds)
     .eq('status', 'active')
@@ -3071,7 +3071,7 @@ async function loadGroupProfile() {
 
   const playerIds = members.map(m => m.player_id);
   const { data: players } = await window._supabase
-    .from('Players')
+    .from('public_players')
     .select('player_id, Username, Ranking, "Profile Photo URL"')
     .in('player_id', playerIds);
 
@@ -3372,7 +3372,7 @@ async function renderJoinRequestsList(groupId, container) {
 
   const pids = reqData.map(r => r.player_id);
   const { data: players } = await window._supabase
-    .from('Players')
+    .from('public_players')
     .select('player_id, Username, Tier, "Profile Photo URL"')
     .in('player_id', pids);
 
@@ -3448,7 +3448,7 @@ async function initAddMember(groupId, existingPlayerIds) {
     }
     debounceTimer = setTimeout(async () => {
       const { data: players } = await window._supabase
-        .from('Players')
+        .from('public_players')
         .select('player_id, Username')
         .ilike('Username', `%${query}%`)
         .limit(5);
@@ -3578,7 +3578,7 @@ async function populateTransferOptions(otherMembers, group, currentPlayerId) {
 
   // Get usernames for other members
   const { data: players } = await window._supabase
-    .from('Players')
+    .from('public_players')
     .select('player_id, Username')
     .in('player_id', otherMembers.map(m => m.player_id));
 
@@ -3802,7 +3802,7 @@ var playerNumber = parseInt(urlParams.get('player_profile_number'), 10);
   }
 
 var result = await window._supabase
-    .from('Players')
+    .from('public_players')
     .select('"Username", "XP", "Tier", "State/Province", "Country", "Position", "Top Skill", "Favorite Player", "Profile Photo URL", "Created", "MVP Count", "Session Totals", "Ranking", "Legacy Points"')
     .eq('player_id', playerNumber)
     .single();

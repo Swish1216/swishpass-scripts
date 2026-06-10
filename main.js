@@ -2839,7 +2839,7 @@ async function initForgotPassword() {
     sendBtn.textContent = "Sending...";
 
     const { error } = await window._supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "https://swishpass.webflow.io/change-password"
+redirectTo: "https://swishpass.com/change-password"
     });
 
     if (error) {
@@ -3515,7 +3515,7 @@ async function removeMemberFromGroup(groupId, targetPlayerId, groupNumber) {
     alert('Failed to remove member. Please try again.');
   } else {
     // Reload the page to reflect the updated members list
-    window.location.href = 'https://swishpass.webflow.io/group-profiles?group_number=' + groupNumber;
+    window.location.href = '/group-profiles?group_number=' + groupNumber
   }
 }
 
@@ -3563,7 +3563,7 @@ async function leaveGroup(group, members, currentPlayerId) {
 if (error) {
     alert('Failed to leave group. Please try again.');
   } else {
-    window.location.href = 'https://swishpass.webflow.io/group-search';
+    window.location.href = '/group-search'
   }
 }
 
@@ -3629,7 +3629,7 @@ async function populateTransferOptions(otherMembers, group, currentPlayerId) {
       return;
     }
 
-window.location.href = 'https://swishpass.webflow.io/group-search';
+window.location.href = '/group-search'
 };
 }
 
@@ -3656,7 +3656,7 @@ async function deleteGroup(group) {
 if (error) {
     alert('Failed to delete group. Please try again.');
   } else {
-    window.location.href = 'https://swishpass.webflow.io/group-search';
+    window.location.href = '/group-search'
   }
 }
 
@@ -3763,7 +3763,7 @@ window.resendConfirmation = async function () {
   const { error } = await window._supabase.auth.resend({
     type: 'signup',
     email: session.user.email,
-options: { emailRedirectTo: 'https://swishpass.webflow.io/sign-in' }
+options: { emailRedirectTo: 'https://swishpass.com/sign-in' }
   });
 
   if (error) {

@@ -2236,9 +2236,12 @@ window.submitSignup = async function() {
   btn.disabled = true;
   btn.innerText = 'Creating account...';
 
-  var signUpResult = await window._supabase.auth.signUp({
+var signUpResult = await window._supabase.auth.signUp({
     email: email,
-    password: password
+    password: password,
+    options: {
+      emailRedirectTo: 'https://swishpass.com/sign-in'
+    }
   });
 
   if (signUpResult.error) {

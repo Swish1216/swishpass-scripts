@@ -711,6 +711,7 @@ window.reportPost = async function(postId) {
     .insert({
       post_id: postId,
       reported_by_email: currentPlayerEmail,
+player_id: currentPlayerProfileNumber,  // ← correct column name
       reason: reason,
       reported_at: new Date().toISOString()
     });

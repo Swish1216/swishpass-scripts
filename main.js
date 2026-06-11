@@ -47,6 +47,7 @@ const PUBLIC_PATHS = [
       else if (path.includes("/profile-setup")) initProfileSetup();
       else if (path.includes("/change-password")) initChangePassword();
       else if (path.includes("/forgot-password")) initForgotPassword();
+      else if (path.includes("/delete-account")) initDeleteAccount();
       if (window.location.pathname === '/groups') initCreateGroup();
       if (window.location.pathname === '/group-profiles') loadGroupProfile();
       
@@ -104,8 +105,9 @@ var authListener = window._supabase.auth.onAuthStateChange(function (event, sess
             else if (path.includes("/change-username")) initChangeUsername();
             else if (path.includes("/profile-setup")) initProfileSetup();
             else if (path.includes("/change-password")) initChangePassword();
-            else if (path.includes("/forgot-password")) initForgotPassword();
-            if (window.location.pathname === '/groups') initCreateGroup();
+else if (path.includes("/forgot-password")) initForgotPassword();
+      else if (path.includes("/delete-account")) initDeleteAccount();
+      if (window.location.pathname === '/groups') initCreateGroup();
             if (window.location.pathname === '/group-profiles') loadGroupProfile();
             
             const signOutBtn = document.getElementById('sign-out-btn');
@@ -125,8 +127,9 @@ if (document.readyState === 'complete') {
             else if (path.includes("/change-username")) initChangeUsername();
             else if (path.includes("/profile-setup")) initProfileSetup();
             else if (path.includes("/change-password")) initChangePassword();
-            else if (path.includes("/forgot-password")) initForgotPassword();
-            if (window.location.pathname === '/groups') initCreateGroup();
+else if (path.includes("/forgot-password")) initForgotPassword();
+      else if (path.includes("/delete-account")) initDeleteAccount();
+      if (window.location.pathname === '/groups') initCreateGroup();
             if (window.location.pathname === '/group-profiles') loadGroupProfile();
 
             const signOutBtn = document.getElementById('sign-out-btn');
@@ -4770,3 +4773,155 @@ function cs_wireEvents() {
   }
 
 })();
+// ========================================
+// DELETE ACCOUNT — /delete-account page
+// Container ID: delete-account-container
+// Uses same Edge Function as the mobile app
+// ========================================
+
+var DELETE_ACCOUNT_EDGE_URL = 'https://wscsrjaylotmcabdwvde.supabase.co/functions/v1/delete-account';
+
+window.addEventListener('load', function () {
+  if (document.getElementById('delete-account-container')) {
+    initDeleteAccount();
+  }
+});
+
+async function initDeleteAccount() {
+  const container = document.getElementById('delete-account-container');
+  if (!container) return;
+
+  const user = await requireAuth();
+  if (!user) return;
+
+  container.innerHTML = `
+    <div class="pop-form">
+      <h2 class="pop-title" style="color:#e24b4a;">Delete Account</h2>
+      <p class="pop-sub">
+        This will permanently delete your account, profile, all posts, session history, XP, badges, and rankings.
+        <strong style="color:#111;display:block;margin-top:8px;">This cannot be undone.</strong>
+      </p>
+
+      <div style="background:#fff5f5;border:1px solid rgba(226,75,74,0.25);border-radius:10px;padding:16px 18px;margin-bottom:24px;">
+        <p style="font-size:13px;color:#555;margin:0 0 8px;font-weight:600;">What will be deleted:</p>
+        <ul style="font-size:13px;color:#777;margin:0;padding-left:18px;line-height:2;">
+          <li>Your player profile and username</li>
+          <li>All XP, tier, and ranking data</li>
+          <li>All session history and validations</li>
+          <li>All badges earned</li>
+          <li>All social feed posts</li>
+          <li>All friend connections</li>
+          <li>Group memberships</li>
+        </ul>
+      </div>
+
+      <label class="pop-label">Type <span style="color:#e24b4a;font-weight:800;letter-spacing:2px;">DELETE</span> to confirm</label>
+      <input
+        type="text"
+        id="da-confirm-input"
+        class="pop-input"
+        placeholder="Type DELETE here"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="characters"
+        spellcheck="false"
+        style="letter-spacing:2px;font-weight:700;"
+      />
+
+      <div id="da-feedback" style="min-height:20px;font-size:13px;color:#e24b4a;margin:8px 0 4px;"></div>
+
+      <button
+        id="da-confirm-btn"
+        class="pop-btn"
+        disabled
+        style="background:#ccc;cursor:not-allowed;margin-top:8px;"
+      >
+        Permanently Delete My Account
+      </button>
+
+      <a href="/profile-settings" style="display:block;text-align:center;font-size:14px;color:#888;margin-top:20px;text-decoration:none;">
+        ← Cancel, go back to settings
+      </a>
+    </div>
+  `;
+
+  injectPopStyles();
+
+  const input   = document.getElementById('da-confirm-input');
+  const btn     = document.getElementById('da-confirm-btn');
+  const feedback = document.getElementById('da-feedback');
+
+  // Enable button only when input matches exactly "DELETE"
+  input.addEventListener('input', function () {
+    var val = input.value.trim();
+    if (val === 'DELETE') {
+      btn.disabled = false;
+      btn.style.background = '#e24b4a';
+      btn.style.cursor = 'pointer';
+      feedback.textContent = '';
+    } else {
+      btn.disabled = true;
+      btn.style.background = '#ccc';
+      btn.style.cursor = 'not-allowed';
+    }
+  });
+
+  btn.addEventListener('click', async function () {
+    if (input.value.trim() !== 'DELETE') return;
+
+    btn.disabled = true;
+    btn.textContent = 'Deleting...';
+    btn.style.background = '#e24b4a';
+    btn.style.opacity = '0.7';
+    feedback.textContent = '';
+
+    try {
+      const { data: { session } } = await window._supabase.auth.getSession();
+      if (!session) {
+        feedback.textContent = 'Session expired. Please log in again.';
+        btn.disabled = false;
+        btn.textContent = 'Permanently Delete My Account';
+        btn.style.opacity = '1';
+        return;
+      }
+
+      const response = await fetch(DELETE_ACCOUNT_EDGE_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + session.access_token,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Deletion failed. Please try again.');
+      }
+
+      // Sign out locally — auth user already deleted server-side
+      await window._supabase.auth.signOut();
+
+      // Show success state before redirect
+      container.innerHTML = `
+        <div class="pop-form" style="text-align:center;">
+          <div style="font-size:52px;margin-bottom:16px;">✓</div>
+          <h2 class="pop-title">Account Deleted</h2>
+          <p class="pop-sub">Your account and all associated data have been permanently removed. Redirecting you now...</p>
+        </div>
+      `;
+      injectPopStyles();
+
+      setTimeout(function () {
+        window.location.href = '/sign-up';
+      }, 2500);
+
+    } catch (err) {
+      console.error('Delete account error:', err);
+      feedback.textContent = err.message || 'Something went wrong. Please try again or contact patrick@swishpass.com.';
+      btn.disabled = false;
+      btn.textContent = 'Permanently Delete My Account';
+      btn.style.opacity = '1';
+    }
+  });
+}

@@ -2,6 +2,7 @@
 // GLOBAL AUTH GUARD — runs on every page
 // ========================================
 const PUBLIC_PATHS = [
+  "/",
   "/features",
   "/terms-and-conditions",
   "/privacy-policy",

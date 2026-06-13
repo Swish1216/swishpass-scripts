@@ -2,22 +2,18 @@
 // GLOBAL AUTH GUARD — runs on every page
 // ========================================
 const PUBLIC_PATHS = [
-  "/",           // ← ADD THIS
-  "/sign-in",
-  "/sign-up",
-  "/confirm-email",
-  "/username-setup",
-  "/profile-setup",
-  "/forgot-password",
-  "/change-password",
-  "/home",
   "/features",
-  "/pricing",
   "/terms-and-conditions",
   "/privacy-policy",
+  "/cookie-policy",
   "/faq",
   "/contact-us",
-  "/coming-soon"
+  "/sign-up",
+  "/sign-in",
+  "/confirm-email",
+  "/forgot-password",
+  "/change-password",
+  "/username-setup"
 ];
 
 // ── Supabase email confirmation redirect ──────────────────────────────────

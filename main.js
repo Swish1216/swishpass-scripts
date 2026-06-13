@@ -243,14 +243,32 @@ window.loadLeaderboard = async function() {
   var search = document.getElementById('lb-search') ? document.getElementById('lb-search').value.toLowerCase() : '';
   var country = document.getElementById('lb-country') ? document.getElementById('lb-country').value : '';
   var state = document.getElementById('lb-state') ? document.getElementById('lb-state').value : '';
-var result = await window._supabase
-    .from('public_players')
-    .select('"Username", "Tier", "XP", "State/Province", "Country"')
-    .eq('status', 'active')
-    .order('"XP"', { ascending: false });
-  var data = result.data;
-  var error = result.error;
-  if (error) { console.error(error); return; }
+
+  // ── Fetch players (cached 60s) ──────────────────────────────────────────
+  var players = cacheGet('leaderboard_players');
+  if (!players) {
+    var result = await window._supabase
+      .from('public_players')
+      .select('"Username", "Tier", "XP", "State/Province", "Country"')
+      .eq('status', 'active')
+      .order('"XP"', { ascending: false });
+    if (result.error) { console.error(result.error); return; }
+    players = result.data;
+    cacheSet('leaderboard_players', players, 60);
+  }
+
+  // ── Fetch all for filter dropdowns (cached 300s — changes rarely) ───────
+  var allData = cacheGet('leaderboard_all');
+  if (!allData) {
+    var allResult = await window._supabase
+      .from('public_players')
+      .select('"Country", "State/Province"');
+    allData = allResult.data || [];
+    cacheSet('leaderboard_all', allData, 300);
+  }
+
+  // ── Apply filters client-side ───────────────────────────────────────────
+  var data = players.slice(); // don't mutate cached array
   if (search) {
     data = data.filter(function(p) {
       return p.Username && p.Username.toLowerCase().includes(search);
@@ -262,16 +280,14 @@ var result = await window._supabase
   if (state) {
     data = data.filter(function(p) { return p['State/Province'] === state; });
   }
-  var allResult = await window._supabase
-    .from('public_players')
-    .select('"Country", "State/Province"');
-  var allData = allResult.data || [];
-var countries = [...new Set(allData.map(function(p) { return p.Country; }).filter(function(c) {
-  return c && c !== 'N/A' && c.trim() !== '';
-}))].sort();
-var states = [...new Set(allData.map(function(p) { return p['State/Province']; }).filter(function(s) {
-  return s && s !== 'N/A' && s.trim() !== '';
-}))].sort();
+
+  var countries = [...new Set(allData.map(function(p) { return p.Country; }).filter(function(c) {
+    return c && c !== 'N/A' && c.trim() !== '';
+  }))].sort();
+  var states = [...new Set(allData.map(function(p) { return p['State/Province']; }).filter(function(s) {
+    return s && s !== 'N/A' && s.trim() !== '';
+  }))].sort();
+
   var rows = data.map(function(p, i) {
     return '<tr style="border-bottom:1px solid #f5f5f5;">'
       + '<td style="padding:12px 14px;color:#888;">' + (i + 1) + '</td>'
@@ -323,13 +339,19 @@ window.addEventListener('load', function() {
 window.loadBadges = async function() {
   var container = document.getElementById('badges-container');
   if (!container) return;
-  var result = await window._supabase
-    .from('Badges')
-    .select('"Name", "Notes", "URL", "Badge Image URL", "Season", "Start Date", "End Date", "Badge #"')
-    .order('"Badge #"', { ascending: true });
-  var data = result.data;
-  var error = result.error;
-  if (error) { console.error(error); return; }
+
+  // ── Fetch badge catalog (cached 600s — 10 min) ──────────────────────────
+  var data = cacheGet('badges_catalog');
+  if (!data) {
+    var result = await window._supabase
+      .from('Badges')
+      .select('"Name", "Notes", "URL", "Badge Image URL", "Season", "Start Date", "End Date", "Badge #"')
+      .order('"Badge #"', { ascending: true });
+    if (result.error) { console.error(result.error); return; }
+    data = result.data;
+    cacheSet('badges_catalog', data, 600);
+  }
+
   var items = data.map(function(b) {
     var badgeId = 'badge-' + (b['Badge #'] || Math.random());
     return '<div style="display:flex;align-items:flex-start;gap:16px;padding:16px;border-bottom:1px solid #f0f0f0;">'
@@ -341,7 +363,7 @@ window.loadBadges = async function() {
       + '<p style="font-size:12px;color:#888;margin:0 0 2px;">End: ' + (b['End Date'] || 'N/A') + '</p>'
       + '<p style="font-size:12px;color:#888;margin:0;">Season: ' + (b.Season || 'N/A') + '</p>'
       + '</div>'
-+ '<button onclick="showBadgeModal(this)" data-badge=\'' + JSON.stringify(b).replace(/'/g, '&#39;') + '\' style="font-size:12px;color:#555;cursor:pointer;white-space:nowrap;align-self:center;padding:6px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;">View →</button>'
+      + '<button onclick="showBadgeModal(this)" data-badge=\'' + JSON.stringify(b).replace(/'/g, '&#39;') + '\' style="font-size:12px;color:#555;cursor:pointer;white-space:nowrap;align-self:center;padding:6px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;">View →</button>'
       + '</div>';
   }).join('');
 
@@ -393,16 +415,20 @@ window.loadCourts = async function() {
   var type     = document.getElementById('courts-type')     ? document.getElementById('courts-type').value    : '';
   var verified = document.getElementById('courts-verified') ? document.getElementById('courts-verified').value : '';
 
-  var result = await window._supabase
-    .from('Courts')
-    .select('court_id, court_name, address, city, state, zip_code, "Country", court_type, verified')
-    .order('court_name', { ascending: true });
+  // ── Fetch court directory (cached 300s — 5 min) ─────────────────────────
+  var allData = cacheGet('courts_all');
+  if (!allData) {
+    var result = await window._supabase
+      .from('Courts')
+      .select('court_id, court_name, address, city, state, zip_code, "Country", court_type, verified')
+      .order('court_name', { ascending: true });
+    if (result.error) { console.error(result.error); return; }
+    allData = result.data;
+    cacheSet('courts_all', allData, 300);
+  }
 
-  var data = result.data;
-  var error = result.error;
-  if (error) { console.error(error); return; }
-  var allData = data;
-
+  // ── Apply filters client-side ───────────────────────────────────────────
+  var data = allData.slice(); // don't mutate cached array
   if (search) {
     data = data.filter(function(c) {
       return (c.court_name || '').toLowerCase().includes(search)
@@ -500,8 +526,8 @@ window.addEventListener('load', function() {
     usernameAvailable = false;
     if (btn) btn.disabled = true;
     if (!username) { result.innerHTML = ''; return; }
-    if (username.length < 6) {
-      result.innerHTML = '<span style="color:#888;">Must be at least 6 characters</span>';
+if (username.length < 3) {
+  result.innerHTML = '<span style="color:#888;">Must be at least 3 characters</span>';
       return;
     }
     result.innerHTML = '<span style="color:#888;">Checking...</span>';
@@ -547,8 +573,8 @@ window.addEventListener('load', function() {
     usernameAvailable2 = false;
     if (btn) btn.disabled = true;
     if (!username) { result.innerHTML = ''; return; }
-    if (username.length < 6) {
-      result.innerHTML = '<span style="color:#888;">Must be at least 6 characters</span>';
+    if (username.length < 3) {
+      result.innerHTML = '<span style="color:#888;">Must be at least 3 characters</span>';
       return;
     }
     result.innerHTML = '<span style="color:#888;">Checking...</span>';
@@ -1342,6 +1368,38 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+// ========================================
+// IN-MEMORY CACHE
+// ========================================
+var _cache = {};
+
+function cacheGet(key) {
+  var entry = _cache[key];
+  if (!entry) return null;
+  if (Date.now() > entry.expires) {
+    delete _cache[key];
+    return null;
+  }
+  return entry.data;
+}
+
+function cacheSet(key, data, ttlSeconds) {
+  _cache[key] = {
+    data: data,
+    expires: Date.now() + (ttlSeconds * 1000)
+  };
+}
+
+function cacheClear(key) {
+  if (key) {
+    delete _cache[key];
+  } else {
+    _cache = {};
+  }
+}
+// ========================================
+// END IN-MEMORY CACHE
+// ========================================
 
 
 // ========================================
@@ -1395,19 +1453,27 @@ window.initLiveCourtFeed = async function() {
 window.liveCourtFeedData = [];
 
 window.loadLiveCourtFeedData = async function() {
-  var courtsResult = await window._supabase
-    .from('Courts')
-    .select('court_id, court_name, address, city, state, "Country"')
-    .order('court_name', { ascending: true });
+  // ── Fetch courts (cached 300s — reuses courts cache if available) ────────
+  var courts = cacheGet('courts_live_base');
+  if (!courts) {
+    var courtsResult = await window._supabase
+      .from('Courts')
+      .select('court_id, court_name, address, city, state, "Country"')
+      .order('court_name', { ascending: true });
+    courts = courtsResult.data || [];
+    cacheSet('courts_live_base', courts, 300);
+  }
 
-  var courts = courtsResult.data || [];
-
-  var activeSessionsResult = await window._supabase
-    .from('Sessions Forms')
-    .select('court_id')
-    .is('end_time', null);
-
-  var activeSessions = activeSessionsResult.data || [];
+  // ── Fetch active sessions (cached 30s — live feed stays fresh) ──────────
+  var activeSessions = cacheGet('live_feed_sessions');
+  if (!activeSessions) {
+    var activeSessionsResult = await window._supabase
+      .from('Sessions Forms')
+      .select('court_id')
+      .is('end_time', null);
+    activeSessions = activeSessionsResult.data || [];
+    cacheSet('live_feed_sessions', activeSessions, 30);
+  }
 
   var activeCounts = {};
   activeSessions.forEach(function(s) {
@@ -2314,7 +2380,7 @@ async function initUsernameSetup() {
   container.innerHTML = `
     <div class="pop-form">
       <h2 class="pop-title">Pick your username</h2>
-      <p class="pop-sub">This is how other players will find and tag you. Minimum 6 characters.</p>
+      <p class="pop-sub">This is how other players will find and tag you. Minimum 3 characters.</p>
       <input type="text" id="username-input" class="pop-input" placeholder="Username" autocomplete="off" />
       <div id="username-feedback" class="pop-feedback"></div>
       <button id="submit-username-btn" class="pop-btn" disabled>Continue</button>
@@ -2335,8 +2401,8 @@ async function initUsernameSetup() {
     isAvailable = false;
     submitBtn.disabled = true;
 
-    if (value.length < 6) {
-      feedback.textContent = "Must be at least 6 characters.";
+    if (value.length < 3) {
+      feedback.textContent = "Must be at least 3 characters.";
       feedback.style.color = "#888";
       return;
     }
@@ -2434,8 +2500,8 @@ async function initChangeUsername() {
     isAvailable = false;
     submitBtn.disabled = true;
 
-    if (value.length < 6) {
-      feedback.textContent = "Must be at least 6 characters.";
+    if (value.length < 3) {
+      feedback.textContent = "Must be at least 3 characters.";
       feedback.style.color = "#888";
       return;
     }
@@ -4428,7 +4494,9 @@ cs_selectedType   = '';
       if (insertResult.error) throw new Error(insertResult.error.message);
 
       // 6. Success
-      var form = document.getElementById('cs-form');
+cacheClear('courts_all');        // ← ADD THIS LINE
+cacheClear('courts_live_base');  // ← ADD THIS LINE
+var form = document.getElementById('cs-form');
       if (form) form.style.display = 'none';
       var success = document.getElementById('cs-success');
       if (success) success.style.display = 'flex';

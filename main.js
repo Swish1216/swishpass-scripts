@@ -33,7 +33,7 @@ const PUBLIC_PATHS = [
 
 (function () {
   const path = window.location.pathname;
-  const isPublic = PUBLIC_PATHS.some(function (p) { return path.includes(p); });
+const isPublic = PUBLIC_PATHS.some(function (p) { return p === "/" ? path === "/" : path.includes(p); });
 
   if (isPublic) {
     // Public page — still run page init on DOMContentLoaded

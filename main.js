@@ -1263,6 +1263,18 @@ function escHtml(str) {
 }
 
 // ========================================
+// DEBOUNCE UTILITY
+// ========================================
+function debounce(fn, delay) {
+  var timer;
+  return function() {
+    var args = arguments;
+    clearTimeout(timer);
+    timer = setTimeout(function() { fn.apply(this, args); }, delay);
+  };
+}
+
+// ========================================
 // IN-MEMORY CACHE
 // ========================================
 var _cache = {};
@@ -1345,15 +1357,17 @@ window.initLiveCourtFeed = async function() {
 
   await window.loadLiveCourtFeedData();
 
-  liveCourtFeedSubscription = window._supabase
-    .channel('live-court-feed-changes')
-    .on('postgres_changes',
-      { event: '*', schema: 'public', table: 'Sessions Forms' },
-      function() {
-        window.loadLiveCourtFeedData();
-      }
-    )
-    .subscribe();
+var debouncedLoadLiveCourtFeed = debounce(window.loadLiveCourtFeedData, 5000);
+
+liveCourtFeedSubscription = window._supabase
+  .channel('live-court-feed-changes')
+  .on('postgres_changes',
+    { event: '*', schema: 'public', table: 'Sessions Forms' },
+    function() {
+      debouncedLoadLiveCourtFeed();
+    }
+  )
+  .subscribe();
 };
 
 window.liveCourtFeedData = [];

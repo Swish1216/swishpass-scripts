@@ -732,11 +732,16 @@ window.loadFriendsFeed = async function() {
     .select('player_1_id, player_2_id')
     .or('player_1_id.eq.' + currentPlayerProfileNumber + ',player_2_id.eq.' + currentPlayerProfileNumber);
 
-  sfFriendIds = (friendsResult.data || []).map(function(f) {
+sfFriendIds = (friendsResult.data || []).map(function(f) {
     return Number(f.player_1_id) === Number(currentPlayerProfileNumber)
       ? Number(f.player_2_id)
       : Number(f.player_1_id);
   });
+
+  // Always include own posts in the Friends feed
+  if (!sfFriendIds.includes(Number(currentPlayerProfileNumber))) {
+    sfFriendIds.push(Number(currentPlayerProfileNumber));
+  }
 
   if (sfFriendIds.length === 0) {
     postsEl.innerHTML = ''

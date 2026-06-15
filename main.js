@@ -395,112 +395,6 @@ window.showBadgeModal = function(btnOrData) {
   document.body.appendChild(overlay);
 };
 
-
-
-// ========================================
-// COURT DIRECTORY
-// ========================================
-window.addEventListener('load', function() {
-  if (document.getElementById('courts-container')) {
-    window.loadCourts();
-  }
-});
-
-window.loadCourts = async function() {
-  var container = document.getElementById('courts-container');
-  if (!container) return;
-  var search   = document.getElementById('courts-search')   ? document.getElementById('courts-search').value.toLowerCase()  : '';
-  var city     = document.getElementById('courts-city')     ? document.getElementById('courts-city').value    : '';
-  var state    = document.getElementById('courts-state')    ? document.getElementById('courts-state').value   : '';
-  var type     = document.getElementById('courts-type')     ? document.getElementById('courts-type').value    : '';
-  var verified = document.getElementById('courts-verified') ? document.getElementById('courts-verified').value : '';
-
-  // ── Fetch court directory (cached 300s — 5 min) ─────────────────────────
-  var allData = cacheGet('courts_all');
-  if (!allData) {
-    var result = await window._supabase
-      .from('Courts')
-      .select('court_id, court_name, address, city, state, zip_code, "Country", court_type, verified')
-      .order('court_name', { ascending: true });
-    if (result.error) { console.error(result.error); return; }
-    allData = result.data;
-    cacheSet('courts_all', allData, 300);
-  }
-
-  // ── Apply filters client-side ───────────────────────────────────────────
-  var data = allData.slice(); // don't mutate cached array
-  if (search) {
-    data = data.filter(function(c) {
-      return (c.court_name || '').toLowerCase().includes(search)
-        || (c.address     || '').toLowerCase().includes(search)
-        || (c.city        || '').toLowerCase().includes(search);
-    });
-  }
-  if (city)     data = data.filter(function(c) { return c.city       === city; });
-  if (state)    data = data.filter(function(c) { return c.state      === state; });
-  if (type)     data = data.filter(function(c) { return c.court_type === type; });
-  if (verified !== '') data = data.filter(function(c) { return c.verified === parseInt(verified); });
-
-  var cities = [...new Set(allData.map(function(c) { return c.city;       }).filter(Boolean))].sort();
-  var states = [...new Set(allData.map(function(c) { return c.state;      }).filter(Boolean))].sort();
-  var types  = [...new Set(allData.map(function(c) { return c.court_type; }).filter(Boolean))].sort();
-
-  var rows = data.map(function(c) {
-    var verifiedBadge = c.verified === 1
-      ? '<span style="padding:2px 8px;background:#e6f4ea;color:#2d7a3a;border-radius:4px;font-size:11px;font-weight:500;">Verified</span>'
-      : '<span style="padding:2px 8px;background:#f5f5f5;color:#888;border-radius:4px;font-size:11px;">Unverified</span>';
-    return '<tr style="border-bottom:1px solid #f5f5f5;">'
-      + '<td style="padding:12px 8px;color:#111;font-weight:500;">' + (c.court_name || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">'                 + (c.address    || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">'                 + (c.city       || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">'                 + (c.state      || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">'                 + (c.zip_code   || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">'                 + (c.Country    || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">'                 + (c.court_type || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;">'                            + verifiedBadge           + '</td>'
-      + '</tr>';
-  }).join('');
-
-  var cityOptions  = cities.map(function(c) { return '<option value="'+c+'"'+(c===city  ?' selected':'')+'>'+c+'</option>'; }).join('');
-  var stateOptions = states.map(function(s) { return '<option value="'+s+'"'+(s===state ?' selected':'')+'>'+s+'</option>'; }).join('');
-  var typeOptions  = types.map(function(t)  { return '<option value="'+t+'"'+(t===type  ?' selected':'')+'>'+t+'</option>'; }).join('');
-
-  container.innerHTML = ''
-    + '<div style="padding:0 16px;">'
-    + '<h2 style="font-size:22px;font-weight:500;margin-bottom:1.25rem;color:#111;">Court Directory</h2>'
-    + '<div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap;">'
-    + '<input id="courts-search" type="text" placeholder="Search courts..." value="' + search + '" oninput="loadCourts()" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;" />'
-    + '<select id="courts-city"     onchange="loadCourts()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;"><option value="">City</option>'          + cityOptions  + '</select>'
-    + '<select id="courts-state"    onchange="loadCourts()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;"><option value="">State</option>'         + stateOptions + '</select>'
-    + '<select id="courts-type"     onchange="loadCourts()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;"><option value="">Indoor/Outdoor</option>' + typeOptions  + '</select>'
-    + '<select id="courts-verified" onchange="loadCourts()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;">'
-    + '<option value="">All Courts</option>'
-    + '<option value="1"' + (verified === '1' ? ' selected' : '') + '>Verified Only</option>'
-    + '<option value="0"' + (verified === '0' ? ' selected' : '') + '>Unverified Only</option>'
-    + '</select>'
-    + '</div>'
-    + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;max-width:100%;display:block;box-sizing:border-box;">'
-    + '<table style="min-width:900px;width:100%;border-collapse:collapse;font-size:13px;">'
-    + '<thead><tr style="border-bottom:1px solid #eee;">'
-    + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Court Name</th>'
-    + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Address</th>'
-    + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">City</th>'
-    + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">State</th>'
-    + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Zip</th>'
-    + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Country</th>'
-    + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Type</th>'
-    + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Status</th>'
-    + '</tr></thead>'
-    + '<tbody>'
-    + (rows || '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#888;">No courts found</td></tr>')
-    + '</tbody>'
-    + '</table>'
-    + '</div>'
-    + '</div>';
-};
-
-
-
 // ========================================
 // USERNAME CHECKER (signup page variant 1)
 // ========================================
@@ -1419,11 +1313,21 @@ window.initLiveCourtFeed = async function() {
 
   container.innerHTML = ''
     + '<div style="padding:0 16px;">'
-    + '<h2 style="font-size:22px;font-weight:500;margin-bottom:8px;color:#111;">Live Court Feed</h2>'
+    + '<h2 style="font-size:22px;font-weight:500;margin-bottom:8px;color:#111;">Court Directory</h2>'
     + '<p style="font-size:13px;color:#888;margin-bottom:1rem;">See how busy each court is right now. Updates automatically.</p>'
-    + '<input id="lcf-search" type="text" placeholder="Search courts..." oninput="renderLiveCourtFeed()" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:1rem;color:#111;box-sizing:border-box;" />'
+    + '<div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap;">'
+    + '<input id="lcf-search" type="text" placeholder="Search courts..." oninput="renderLiveCourtFeed()" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;" />'
+    + '<select id="lcf-city" onchange="renderLiveCourtFeed()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;"><option value="">City</option></select>'
+    + '<select id="lcf-state" onchange="renderLiveCourtFeed()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;"><option value="">State</option></select>'
+    + '<select id="lcf-type" onchange="renderLiveCourtFeed()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;"><option value="">Indoor/Outdoor</option></select>'
+    + '<select id="lcf-verified" onchange="renderLiveCourtFeed()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;color:#111;background:#fff;">'
+    + '<option value="">All Courts</option>'
+    + '<option value="1">Verified Only</option>'
+    + '<option value="0">Unverified Only</option>'
+    + '</select>'
+    + '</div>'
     + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;max-width:100%;box-sizing:border-box;">'
-    + '<table style="min-width:700px;width:100%;border-collapse:collapse;font-size:13px;">'
+    + '<table style="min-width:800px;width:100%;border-collapse:collapse;font-size:13px;">'
     + '<thead><tr style="border-bottom:1px solid #eee;">'
     + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Court Name</th>'
     + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Active Now</th>'
@@ -1431,8 +1335,10 @@ window.initLiveCourtFeed = async function() {
     + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">City</th>'
     + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">State</th>'
     + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Country</th>'
+    + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Type</th>'
+    + '<th style="text-align:left;padding:10px 8px;color:#888;font-weight:500;">Status</th>'
     + '</tr></thead>'
-    + '<tbody id="lcf-body"><tr><td colspan="6" style="padding:2rem;text-align:center;color:#888;">Loading...</td></tr></tbody>'
+    + '<tbody id="lcf-body"><tr><td colspan="8" style="padding:2rem;text-align:center;color:#888;">Loading...</td></tr></tbody>'
     + '</table>'
     + '</div>'
     + '</div>';
@@ -1453,12 +1359,12 @@ window.initLiveCourtFeed = async function() {
 window.liveCourtFeedData = [];
 
 window.loadLiveCourtFeedData = async function() {
-  // ── Fetch courts (cached 300s — reuses courts cache if available) ────────
+  // ── Fetch courts (cached 300s) ───────────────────────────────────────────
   var courts = cacheGet('courts_live_base');
   if (!courts) {
     var courtsResult = await window._supabase
       .from('Courts')
-      .select('court_id, court_name, address, city, state, "Country"')
+      .select('court_id, court_name, address, city, state, "Country", court_type, verified')
       .order('court_name', { ascending: true });
     courts = courtsResult.data || [];
     cacheSet('courts_live_base', courts, 300);
@@ -1488,9 +1394,43 @@ window.loadLiveCourtFeedData = async function() {
       city:        c.city,
       state:       c.state,
       country:     c.Country,
+      courtType:   c.court_type,
+      verified:    c.verified,
       activeCount: activeCounts[c.court_id] || 0
     };
   });
+
+  // ── Populate filter dropdowns (only on first load) ───────────────────────
+  var citySelect     = document.getElementById('lcf-city');
+  var stateSelect    = document.getElementById('lcf-state');
+  var typeSelect     = document.getElementById('lcf-type');
+
+  if (citySelect && citySelect.options.length <= 1) {
+    var cities = [...new Set(courts.map(function(c) { return c.city; }).filter(Boolean))].sort();
+    cities.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      citySelect.appendChild(opt);
+    });
+  }
+
+  if (stateSelect && stateSelect.options.length <= 1) {
+    var states = [...new Set(courts.map(function(c) { return c.state; }).filter(Boolean))].sort();
+    states.forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s; opt.textContent = s;
+      stateSelect.appendChild(opt);
+    });
+  }
+
+  if (typeSelect && typeSelect.options.length <= 1) {
+    var types = [...new Set(courts.map(function(c) { return c.court_type; }).filter(Boolean))].sort();
+    types.forEach(function(t) {
+      var opt = document.createElement('option');
+      opt.value = t; opt.textContent = t;
+      typeSelect.appendChild(opt);
+    });
+  }
 
   window.renderLiveCourtFeed();
 };
@@ -1499,40 +1439,63 @@ window.renderLiveCourtFeed = function() {
   var body = document.getElementById('lcf-body');
   if (!body) return;
 
-  var searchInput = document.getElementById('lcf-search');
-  var search = searchInput ? searchInput.value.toLowerCase() : '';
+  var searchInput   = document.getElementById('lcf-search');
+  var citySelect    = document.getElementById('lcf-city');
+  var stateSelect   = document.getElementById('lcf-state');
+  var typeSelect    = document.getElementById('lcf-type');
+  var verifiedSelect = document.getElementById('lcf-verified');
 
-  var filtered = window.liveCourtFeedData;
+  var search   = searchInput    ? searchInput.value.toLowerCase()  : '';
+  var city     = citySelect     ? citySelect.value                  : '';
+  var state    = stateSelect    ? stateSelect.value                 : '';
+  var type     = typeSelect     ? typeSelect.value                  : '';
+  var verified = verifiedSelect ? verifiedSelect.value              : '';
+
+  var filtered = window.liveCourtFeedData.slice();
+
   if (search) {
     filtered = filtered.filter(function(c) {
       return (c.courtName || '').toLowerCase().includes(search)
-        || (c.city || '').toLowerCase().includes(search)
-        || (c.address || '').toLowerCase().includes(search);
+        || (c.city        || '').toLowerCase().includes(search)
+        || (c.address     || '').toLowerCase().includes(search);
     });
   }
+  if (city)     filtered = filtered.filter(function(c) { return c.city      === city; });
+  if (state)    filtered = filtered.filter(function(c) { return c.state     === state; });
+  if (type)     filtered = filtered.filter(function(c) { return c.courtType === type; });
+  if (verified !== '') {
+    filtered = filtered.filter(function(c) { return c.verified === parseInt(verified); });
+  }
 
+  // Sort: active courts first, then alphabetical
   filtered.sort(function(a, b) {
     if (b.activeCount !== a.activeCount) return b.activeCount - a.activeCount;
     return (a.courtName || '').localeCompare(b.courtName || '');
   });
 
   if (filtered.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" style="padding:2rem;text-align:center;color:#888;">No courts found</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#888;">No courts found</td></tr>';
     return;
   }
 
   body.innerHTML = filtered.map(function(c) {
-    var badge = c.activeCount > 0
+    var activeBadge = c.activeCount > 0
       ? '<span style="padding:3px 10px;background:#e6f4ea;color:#2d7a3a;border-radius:12px;font-size:12px;font-weight:500;"><span style="display:inline-block;width:6px;height:6px;background:#2d7a3a;border-radius:50%;margin-right:5px;"></span>' + c.activeCount + ' active</span>'
       : '<span style="padding:3px 10px;background:#f5f5f5;color:#888;border-radius:12px;font-size:12px;">0</span>';
 
+    var verifiedBadge = c.verified === 1
+      ? '<span style="padding:2px 8px;background:#e6f4ea;color:#2d7a3a;border-radius:4px;font-size:11px;font-weight:500;">Verified</span>'
+      : '<span style="padding:2px 8px;background:#f5f5f5;color:#888;border-radius:4px;font-size:11px;">Unverified</span>';
+
     return '<tr style="border-bottom:1px solid #f5f5f5;">'
-      + '<td style="padding:12px 8px;color:#111;font-weight:500;">' + (c.courtName || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;">' + badge + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">' + (c.address || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">' + (c.city || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">' + (c.state || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">' + (c.country || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#111;font-weight:500;">' + (c.courtName  || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;">'                            + activeBadge              + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + (c.address    || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + (c.city       || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + (c.state      || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + (c.country    || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + (c.courtType  || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;">'                            + verifiedBadge            + '</td>'
       + '</tr>';
   }).join('');
 };

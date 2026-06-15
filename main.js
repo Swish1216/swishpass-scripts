@@ -535,19 +535,41 @@ window.initSocialFeed = function() {
   container.innerHTML = ''
     + '<div style="padding:0 16px;max-width:640px;margin:0 auto;">'
     + '<h2 style="font-size:22px;font-weight:500;margin-bottom:1.25rem;color:#111;">Social Feed</h2>'
+
+    // ── Tab switcher ──────────────────────────────────────────────────────
+    + '<div id="sf-tab-switcher" style="display:flex;border-bottom:2px solid #eee;margin-bottom:1.25rem;">'
+    + '<button id="sf-tab-global" onclick="window.switchSocialTab(\'global\')" style="flex:1;padding:10px 0;background:none;border:none;border-bottom:3px solid #111;font-size:14px;font-weight:600;color:#111;cursor:pointer;margin-bottom:-2px;">Global</button>'
+    + '<button id="sf-tab-friends" onclick="window.switchSocialTab(\'friends\')" style="flex:1;padding:10px 0;background:none;border:none;border-bottom:3px solid transparent;font-size:14px;font-weight:600;color:#888;cursor:pointer;margin-bottom:-2px;">Friends</button>'
+    + '</div>'
+
+    // ── Global feed ───────────────────────────────────────────────────────
+    + '<div id="sf-panel-global">'
     + '<div id="social-feed-posts" style="display:flex;flex-direction:column;gap:20px;"></div>'
     + '<div id="social-feed-loader" style="text-align:center;padding:20px;color:#888;font-size:14px;">Loading more posts...</div>'
     + '<div id="social-feed-end" style="text-align:center;padding:20px;color:#888;font-size:14px;display:none;">You\'ve reached the end</div>'
+    + '</div>'
+
+    // ── Friends feed ──────────────────────────────────────────────────────
+    + '<div id="sf-panel-friends" style="display:none;">'
+    + '<div id="sf-friends-posts" style="display:flex;flex-direction:column;gap:20px;"></div>'
+    + '<div id="sf-friends-loader" style="text-align:center;padding:20px;color:#888;font-size:14px;">Loading...</div>'
+    + '<div id="sf-friends-end" style="text-align:center;padding:20px;color:#888;font-size:14px;display:none;">You\'ve reached the end</div>'
+    + '</div>'
+
     + '</div>';
 
   window.loadMoreSocialFeed();
 
   window.addEventListener('scroll', function() {
-    if (socialFeedLoading || socialFeedDone) return;
     var scrollPos = window.innerHeight + window.scrollY;
     var threshold = document.body.offsetHeight - 500;
-    if (scrollPos >= threshold) {
-      window.loadMoreSocialFeed();
+    if (!socialFeedLoading && !socialFeedDone
+        && document.getElementById('sf-panel-global').style.display !== 'none') {
+      if (scrollPos >= threshold) window.loadMoreSocialFeed();
+    }
+    if (!sfFriendsLoading && !sfFriendsDone
+        && document.getElementById('sf-panel-friends') && document.getElementById('sf-panel-friends').style.display !== 'none') {
+      if (scrollPos >= threshold) window.loadMoreFriendsFeed();
     }
   });
 };
@@ -654,7 +676,178 @@ window.deletePost = async function(postId) {
   window.loadMoreSocialFeed();
 };
 
+// ========================================
+// SOCIAL FEED — TAB SWITCHER
+// ========================================
+window.switchSocialTab = function(tab) {
+  var globalPanel  = document.getElementById('sf-panel-global');
+  var friendsPanel = document.getElementById('sf-panel-friends');
+  var globalBtn    = document.getElementById('sf-tab-global');
+  var friendsBtn   = document.getElementById('sf-tab-friends');
+  if (!globalPanel || !friendsPanel) return;
 
+  if (tab === 'global') {
+    globalPanel.style.display  = '';
+    friendsPanel.style.display = 'none';
+    globalBtn.style.borderBottomColor  = '#111';
+    globalBtn.style.color              = '#111';
+    friendsBtn.style.borderBottomColor = 'transparent';
+    friendsBtn.style.color             = '#888';
+  } else {
+    globalPanel.style.display  = 'none';
+    friendsPanel.style.display = '';
+    friendsBtn.style.borderBottomColor = '#111';
+    friendsBtn.style.color             = '#111';
+    globalBtn.style.borderBottomColor  = 'transparent';
+    globalBtn.style.color              = '#888';
+    // Load on first switch
+    if (!sfFriendsLoaded) window.loadFriendsFeed();
+  }
+};
+
+// ========================================
+// SOCIAL FEED — FRIENDS TAB
+// ========================================
+var sfFriendsLoaded   = false;
+var sfFriendsLoading  = false;
+var sfFriendsDone     = false;
+var sfFriendsPage     = 0;
+var sfFriendIds       = [];
+
+window.loadFriendsFeed = async function() {
+  sfFriendsLoaded = true;
+  var loader = document.getElementById('sf-friends-loader');
+  var postsEl = document.getElementById('sf-friends-posts');
+  if (!postsEl) return;
+
+  // Fetch friend IDs
+  if (!currentPlayerProfileNumber) {
+    postsEl.innerHTML = '<p style="text-align:center;color:#888;padding:2rem 0;">You must be logged in to see friend posts.</p>';
+    if (loader) loader.style.display = 'none';
+    return;
+  }
+
+  var friendsResult = await window._supabase
+    .from('Friendships')
+    .select('player_1_id, player_2_id')
+    .or('player_1_id.eq.' + currentPlayerProfileNumber + ',player_2_id.eq.' + currentPlayerProfileNumber);
+
+  sfFriendIds = (friendsResult.data || []).map(function(f) {
+    return Number(f.player_1_id) === Number(currentPlayerProfileNumber)
+      ? Number(f.player_2_id)
+      : Number(f.player_1_id);
+  });
+
+  if (sfFriendIds.length === 0) {
+    postsEl.innerHTML = ''
+      + '<div style="text-align:center;padding:60px 20px;">'
+      + '<div style="font-size:48px;margin-bottom:12px;">🤝</div>'
+      + '<p style="font-size:17px;font-weight:600;color:#111;margin:0 0 6px;">No friend posts yet</p>'
+      + '<p style="font-size:14px;color:#888;line-height:1.6;margin:0;">Add friends to see their court activity here.</p>'
+      + '</div>';
+    if (loader) loader.style.display = 'none';
+    return;
+  }
+
+  sfFriendsPage = 0;
+  sfFriendsDone = false;
+  await window.loadMoreFriendsFeed();
+};
+
+window.loadMoreFriendsFeed = async function() {
+  if (sfFriendsLoading || sfFriendsDone) return;
+  sfFriendsLoading = true;
+
+  var from = sfFriendsPage * POSTS_PER_LOAD;
+  var to   = from + POSTS_PER_LOAD - 1;
+
+  var result = await window._supabase
+    .from('Social Feed')
+    .select('"Feed Posts", "Post", "Attachments", "Players", "Court Name", "Date", "player_id"')
+    .in('player_id', sfFriendIds)
+    .order('"Date"', { ascending: false })
+    .range(from, to);
+
+  var data = result.data;
+  if (result.error) { console.error(result.error); sfFriendsLoading = false; return; }
+
+  var postsEl = document.getElementById('sf-friends-posts');
+  var loader  = document.getElementById('sf-friends-loader');
+  var endMsg  = document.getElementById('sf-friends-end');
+
+  if (!data || data.length === 0) {
+    sfFriendsDone = true;
+    if (loader) loader.style.display = 'none';
+    if (sfFriendsPage === 0 && postsEl) {
+      postsEl.innerHTML = ''
+        + '<div style="text-align:center;padding:60px 20px;">'
+        + '<div style="font-size:48px;margin-bottom:12px;">🤝</div>'
+        + '<p style="font-size:17px;font-weight:600;color:#111;margin:0 0 6px;">No friend posts yet</p>'
+        + '<p style="font-size:14px;color:#888;line-height:1.6;margin:0;">Your friends haven\'t posted yet. Check back after your next run.</p>'
+        + '</div>';
+    } else {
+      if (endMsg) endMsg.style.display = 'block';
+    }
+    sfFriendsLoading = false;
+    return;
+  }
+
+  var newPosts = data.map(function(post) {
+    var isOwner = currentPlayerProfileNumber && post.player_id == currentPlayerProfileNumber;
+    var deleteBtn = isOwner
+      ? '<button onclick="deleteFriendPost(\'' + post['Feed Posts'] + '\')" style="padding:8px 16px;background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">Delete Post</button>'
+      : '';
+    return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
+      + '<div style="position:relative;">'
+      + '<img src="' + (post.Attachments || '') + '" style="width:100%;max-height:500px;object-fit:cover;display:block;" />'
+      + '<span style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);color:#fff;font-size:13px;padding:5px 12px;border-radius:20px;font-weight:500;">' + (post.Players || '') + '</span>'
+      + '</div>'
+      + '<div style="padding:16px 18px;">'
+      + '<div style="display:flex;justify-content:space-between;margin-bottom:10px;">'
+      + '<span style="font-size:12px;color:#888;">' + (post.Date ? formatPostTime(post.Date) : 'N/A') + '</span>'
+      + '<span style="font-size:12px;color:#888;">' + (post['Court Name'] || 'N/A') + '</span>'
+      + '</div>'
+      + (post.Post ? '<p style="font-size:15px;color:#111;margin:0 0 14px;line-height:1.5;">' + post.Post + '</p>' : '')
+      + '<div style="display:flex;gap:8px;">'
+      + '<button onclick="reportPost(\'' + post['Feed Posts'] + '\')" style="padding:8px 16px;background:#378add;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">Report Post</button>'
+      + deleteBtn
+      + '</div>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  if (postsEl) postsEl.insertAdjacentHTML('beforeend', newPosts);
+
+  if (data.length < POSTS_PER_LOAD) {
+    sfFriendsDone = true;
+    if (loader) loader.style.display = 'none';
+    if (endMsg)  endMsg.style.display = 'block';
+  }
+
+  sfFriendsPage++;
+  sfFriendsLoading = false;
+};
+
+window.deleteFriendPost = async function(postId) {
+  if (!currentPlayerProfileNumber) return;
+  if (!confirm('Are you sure you want to delete this post?')) return;
+  var result = await window._supabase
+    .from('Social Feed')
+    .delete()
+    .eq('"Feed Posts"', postId)
+    .eq('"player_id"', currentPlayerProfileNumber);
+  if (result.error) { alert('Error deleting post. Please try again.'); return; }
+  // Reload friends feed
+  sfFriendsPage = 0;
+  sfFriendsDone = false;
+  var postsEl = document.getElementById('sf-friends-posts');
+  var loader  = document.getElementById('sf-friends-loader');
+  var endMsg  = document.getElementById('sf-friends-end');
+  if (postsEl) postsEl.innerHTML = '';
+  if (loader)  loader.style.display = 'block';
+  if (endMsg)  endMsg.style.display = 'none';
+  window.loadMoreFriendsFeed();
+};
 
 // ========================================
 // PLAYER SEARCH

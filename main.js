@@ -781,10 +781,12 @@ window.loadMoreFriendsFeed = async function() {
   var loader  = document.getElementById('sf-friends-loader');
   var endMsg  = document.getElementById('sf-friends-end');
 
-  if (!data || data.length === 0) {
+if (!data || data.length === 0) {
     sfFriendsDone = true;
     if (loader) loader.style.display = 'none';
     if (sfFriendsPage === 0 && postsEl) {
+      // Clear any existing content before showing empty state
+      postsEl.innerHTML = '';
       postsEl.innerHTML = ''
         + '<div style="text-align:center;padding:60px 20px;">'
         + '<div style="font-size:48px;margin-bottom:12px;">🤝</div>'
@@ -822,7 +824,11 @@ window.loadMoreFriendsFeed = async function() {
       + '</div>';
   }).join('');
 
-  if (postsEl) postsEl.insertAdjacentHTML('beforeend', newPosts);
+if (postsEl) {
+    // Clear any empty state message that may have rendered before posts loaded
+    if (sfFriendsPage === 0) postsEl.innerHTML = '';
+    postsEl.insertAdjacentHTML('beforeend', newPosts);
+  }
 
   if (data.length < POSTS_PER_LOAD) {
     sfFriendsDone = true;

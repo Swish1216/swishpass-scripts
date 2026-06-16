@@ -2496,31 +2496,15 @@ var signUpResult = await window._supabase.auth.signUp({
 
   var authUserId = signUpResult.data.user.id;
 
-  var playerInsert = await window._supabase
-    .from('Players')
-    .insert({
-      auth_user_id: authUserId,
-      Email: email,
-      Country: country,
-      'State/Province': state || null,
-      XP: 0,
-Tier: 'Bronze'
-    })
-    .select();
+// Players row is created by the handle_new_user DB trigger
+  // which fires when the user confirms their email.
+  // No frontend insert needed — just redirect to confirm-email.
 
-  if (playerInsert.error) {
-    console.error(playerInsert.error);
-    messageEl.innerHTML = '<span style="color:#e24b4a;">Account created but profile setup failed. Contact support.</span>';
-    btn.disabled = false;
-    btn.innerText = 'Create Account';
-    return;
-  }
+  messageEl.innerHTML = '<span style="color:#2d7a3a;">Account created! Check your email to confirm your address.</span>';
 
-messageEl.innerHTML = '<span style="color:#2d7a3a;">Account created! Check your email to confirm your address.</span>';
-
-setTimeout(function() {
-  window.location.href = '/confirm-email';
-}, 1500);
+  setTimeout(function() {
+    window.location.href = '/confirm-email';
+  }, 1500);
 };
 
 

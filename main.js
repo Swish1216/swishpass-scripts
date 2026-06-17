@@ -2498,6 +2498,57 @@ var signUpResult = await window._supabase.auth.signUp({
 const BYTESCALE_API_KEY = "public_G22nhnC83CH88avhAZxjkQq4tdkn";
 const AUTH_LINK_COLUMN = "auth_user_id";
 
+// ========================================
+// USERNAME VALIDATION — mirrors lib/validation.ts
+// ========================================
+(function() {
+  var BLOCKED_WORDS = [
+    "ahole","anus","ash0le","ash0les","asholes","ass","asshole","assholes",
+    "asswipe","azzhole","bastard","bastards","bitch","bitches","blowjob",
+    "butthole","cock","cockhead","cocks","cocksucker","crap","cum","cumshot",
+    "cunt","cunts","dick","dickhead","dildo","dildos","dyke","ejaculate",
+    "fag","faggit","faggot","faggots","fags","fuck","fucker","fuckin",
+    "fucking","fucks","fuk","fukker","jizz","knob","kunt","masturbate",
+    "motherfuck","motherfucker","nigga","nigger","niggers","nutsack",
+    "penis","phuck","phuk","prick","pussy","rectum","scrotum","semen",
+    "shemale","shit","shits","slut","sluts","spunk","testicle","twat",
+    "vagina","wank","wanker","whore","xrated","xxx",
+    "chink","gook","kike","spic","wetback","n1gr","niig",
+    "pen1s","p3nis","sh1t","f4ck","a55",
+  ];
+  var SUPPLEMENTAL = ["fck","fvck","fuxk","phuq","bellend","nonce"];
+  var USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
+
+  function normalizeLeet(str) {
+    return str.toLowerCase()
+      .replace(/3/g,'e').replace(/4/g,'a').replace(/1/g,'i')
+      .replace(/0/g,'o').replace(/5/g,'s').replace(/7/g,'t')
+      .replace(/@/g,'a').replace(/\$/g,'s').replace(/!/g,'i')
+      .replace(/\+/g,'t').replace(/8/g,'b');
+  }
+  function normalizeLeet2(str) {
+    return str.toLowerCase()
+      .replace(/4/g,'u').replace(/3/g,'e').replace(/1/g,'i')
+      .replace(/0/g,'o').replace(/5/g,'s');
+  }
+  function containsProfanity(text) {
+    var n1 = normalizeLeet(text);
+    var n2 = normalizeLeet2(text);
+    if (BLOCKED_WORDS.some(function(w) { return n1.includes(w) || n2.includes(w); })) return true;
+    if (SUPPLEMENTAL.some(function(w) { return n1.includes(w) || n2.includes(w); })) return true;
+    return false;
+  }
+
+  window.validateUsername = function(username) {
+    if (!username || username.trim().length === 0) return 'Username is required.';
+    if (username.length < 3)  return 'Must be at least 3 characters.';
+    if (username.length > 20) return 'Max 20 characters.';
+    if (!USERNAME_REGEX.test(username)) return 'Only letters, numbers, and underscores.';
+    if (containsProfanity(username)) return 'That username is not allowed.';
+    return null;
+  };
+})();
+
 async function requireAuth() {
   const { data: { user } } = await window._supabase.auth.getUser();
   if (!user) {
@@ -2543,9 +2594,10 @@ async function initUsernameSetup() {
     isAvailable = false;
     submitBtn.disabled = true;
 
-    if (value.length < 3) {
-      feedback.textContent = "Must be at least 3 characters.";
-      feedback.style.color = "#888";
+var validationError = window.validateUsername(value);
+    if (validationError) {
+      feedback.textContent = validationError;
+      feedback.style.color = "#c00";
       return;
     }
 
@@ -2701,12 +2753,13 @@ async function initChangeUsername() {
       return;
     }
  
-    if (value.length < 3) {
-      feedback.textContent = "Must be at least 3 characters.";
-      feedback.style.color = "#888";
+var validationError = window.validateUsername(value);
+    if (validationError) {
+      feedback.textContent = validationError;
+      feedback.style.color = value.toLowerCase() === currentUsername.toLowerCase() ? "#888" : "#c00";
       return;
     }
- 
+
     if (value.toLowerCase() === currentUsername.toLowerCase()) {
       feedback.textContent = "That's already your username.";
       feedback.style.color = "#888";

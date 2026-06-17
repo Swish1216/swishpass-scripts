@@ -2601,94 +2601,184 @@ async function initUsernameSetup() {
 // ========================================
 // /change-username
 // ========================================
+const USERNAME_COOLDOWN_DAYS = 30;
+ 
+function computeChangeUsernameCooldown(usernameChangedAt) {
+  if (!usernameChangedAt) return 0;
+  var lastChanged = new Date(usernameChangedAt);
+  var daysSince = Math.floor((Date.now() - lastChanged.getTime()) / (1000 * 60 * 60 * 24));
+  var remaining = USERNAME_COOLDOWN_DAYS - daysSince;
+  return remaining > 0 ? remaining : 0;
+}
+ 
 async function initChangeUsername() {
   const container = document.getElementById("change-username-container");
   if (!container) return;
-
+ 
   const user = await requireAuth();
   if (!user) return;
-
+ 
+  // Fetch Username, player_id, and username_changed_at in one query
   const { data: currentPlayer } = await window._supabase
     .from("Players")
-    .select("Username")
+    .select("Username, player_id, username_changed_at")
     .eq(AUTH_LINK_COLUMN, user.id)
     .single();
-
-  const currentText = currentPlayer && currentPlayer.Username
-    ? "Current: @" + currentPlayer.Username
+ 
+  const currentUsername = currentPlayer && currentPlayer.Username
+    ? currentPlayer.Username
     : "";
-
+ 
+  const currentPlayerId = currentPlayer ? currentPlayer.player_id : null;
+ 
+  // Compute cooldown
+  const daysRemaining = computeChangeUsernameCooldown(
+    currentPlayer ? currentPlayer.username_changed_at : null
+  );
+  const cooldownActive = daysRemaining > 0;
+ 
+  // Build UI — locked state vs editable state
+  const currentText = currentUsername ? "Current: @" + currentUsername : "";
+ 
   container.innerHTML = `
     <div class="pop-form">
       <h2 class="pop-title">Change your username</h2>
       <div id="current-username" class="pop-current">${currentText}</div>
-      <input type="text" id="username-input" class="pop-input" placeholder="New username" autocomplete="off" />
-      <div id="username-feedback" class="pop-feedback"></div>
-      <button id="submit-username-btn" class="pop-btn" disabled>Save</button>
+      ${cooldownActive ? `
+        <div id="cooldown-notice" style="
+          background: rgba(255,80,0,0.07);
+          border: 1px solid rgba(255,80,0,0.25);
+          border-radius: 10px;
+          padding: 14px 16px;
+          margin-bottom: 20px;
+          font-size: 14px;
+          color: #FF5000;
+          font-weight: 500;
+          line-height: 1.5;
+        ">
+          🔒 You can change your username in
+          <strong>${daysRemaining} day${daysRemaining === 1 ? "" : "s"}</strong>.
+          Usernames can only be changed once every ${USERNAME_COOLDOWN_DAYS} days.
+        </div>
+        <input
+          type="text"
+          class="pop-input"
+          value="${currentUsername}"
+          disabled
+          style="opacity:0.45;cursor:not-allowed;"
+        />
+        <button class="pop-btn" disabled style="background:#ccc;cursor:not-allowed;margin-top:16px;">
+          Save
+        </button>
+      ` : `
+        <input type="text" id="username-input" class="pop-input" placeholder="New username" autocomplete="off" />
+        <div id="username-feedback" class="pop-feedback"></div>
+        <button id="submit-username-btn" class="pop-btn" disabled>Save</button>
+      `}
     </div>
   `;
   injectPopStyles();
-
-  const input = document.getElementById("username-input");
-  const feedback = document.getElementById("username-feedback");
+ 
+  // If cooldown is active, nothing left to wire up
+  if (cooldownActive) return;
+ 
+  const input     = document.getElementById("username-input");
+  const feedback  = document.getElementById("username-feedback");
   const submitBtn = document.getElementById("submit-username-btn");
-
+ 
   let debounceTimer;
   let isAvailable = false;
-
+ 
   input.addEventListener("input", function () {
     clearTimeout(debounceTimer);
     const value = input.value.trim();
     isAvailable = false;
     submitBtn.disabled = true;
-
+    feedback.style.color = "#888";
+ 
+    if (!value) {
+      feedback.textContent = "";
+      return;
+    }
+ 
     if (value.length < 3) {
       feedback.textContent = "Must be at least 3 characters.";
       feedback.style.color = "#888";
       return;
     }
-
-    if (currentPlayer && currentPlayer.Username
-        && value.toLowerCase() === currentPlayer.Username.toLowerCase()) {
+ 
+    if (value.toLowerCase() === currentUsername.toLowerCase()) {
       feedback.textContent = "That's already your username.";
       feedback.style.color = "#888";
       return;
     }
-
+ 
     feedback.textContent = "Checking...";
     feedback.style.color = "#888";
-
+ 
     debounceTimer = setTimeout(async () => {
+      // Uniqueness check against public_players view, excluding self
       const { data, error } = await window._supabase
-        .from("Players")
+        .from("public_players")
         .select("player_id")
         .ilike("Username", value)
+        .neq("player_id", currentPlayerId)
         .limit(1);
-
-      if (error) { feedback.textContent = "Error checking username."; return; }
-
+ 
+      if (error) {
+        feedback.textContent = "Error checking username. Try again.";
+        feedback.style.color = "#c00";
+        return;
+      }
+ 
       if (data && data.length > 0) {
-        feedback.textContent = "Username taken.";
+        isAvailable = false;
+        submitBtn.disabled = true;
+        feedback.textContent = "Username taken — please try another.";
         feedback.style.color = "#c00";
       } else {
-        feedback.textContent = "Available!";
-        feedback.style.color = "#0a0";
         isAvailable = true;
         submitBtn.disabled = false;
+        feedback.textContent = "Username available!";
+        feedback.style.color = "#2d7a3a";
       }
     }, 400);
   });
-
+ 
   submitBtn.addEventListener("click", async function () {
     if (!isAvailable) return;
+ 
+    // Belt-and-suspenders cooldown check at save time
+    const { data: freshPlayer } = await window._supabase
+      .from("Players")
+      .select("username_changed_at")
+      .eq(AUTH_LINK_COLUMN, user.id)
+      .single();
+ 
+    const freshDaysRemaining = computeChangeUsernameCooldown(
+      freshPlayer ? freshPlayer.username_changed_at : null
+    );
+ 
+    if (freshDaysRemaining > 0) {
+      feedback.textContent =
+        "You can change your username in " +
+        freshDaysRemaining + " day" + (freshDaysRemaining === 1 ? "" : "s") + ".";
+      feedback.style.color = "#c00";
+      submitBtn.disabled = true;
+      return;
+    }
+ 
     submitBtn.disabled = true;
     submitBtn.textContent = "Saving...";
-
+ 
     const { error } = await window._supabase
       .from("Players")
-      .update({ "Username": input.value.trim() })
+      .update({
+        "Username": input.value.trim(),
+        "username_changed_at": new Date().toISOString(),
+      })
       .eq(AUTH_LINK_COLUMN, user.id);
-
+ 
     if (error) {
       feedback.textContent = "Error saving. Try again.";
       feedback.style.color = "#c00";
@@ -2697,10 +2787,11 @@ async function initChangeUsername() {
       console.error(error);
       return;
     }
-
+ 
     window.location.href = "/sp-home";
   });
 }
+ 
 
 
 

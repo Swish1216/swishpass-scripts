@@ -610,8 +610,8 @@ window.loadMoreSocialFeed = async function() {
       ? '<button onclick="deletePost(\'' + post['Feed Posts'] + '\')" style="padding:8px 16px;background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">Delete Post</button>'
       : '';
     return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
-      + '<div style="position:relative;">'
-'<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
++ '<div style="position:relative;">'
+      + '<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
       + '<span style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);color:#fff;font-size:13px;padding:5px 12px;border-radius:20px;font-weight:500;">' + (post.Players || '') + '</span>'
       + '</div>'
       + '<div style="padding:16px 18px;">'
@@ -806,8 +806,8 @@ if (!data || data.length === 0) {
       ? '<button onclick="deleteFriendPost(\'' + post['Feed Posts'] + '\')" style="padding:8px 16px;background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">Delete Post</button>'
       : '';
     return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
-      + '<div style="position:relative;">'
-'<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
++ '<div style="position:relative;">'
+      + '<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
       + '<span style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);color:#fff;font-size:13px;padding:5px 12px;border-radius:20px;font-weight:500;">' + (post.Players || '') + '</span>'
       + '</div>'
       + '<div style="padding:16px 18px;">'
@@ -1817,8 +1817,8 @@ var postsContainer = document.getElementById('sf-player-posts');
       ? '<button onclick="deletePost(\'' + post['Feed Posts'] + '\')" style="padding:8px 16px;background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">Delete Post</button>'
       : '';
     return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
-      + '<div style="position:relative;">'
-'<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
++ '<div style="position:relative;">'
+      + '<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
       + '<span style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);color:#fff;font-size:13px;padding:5px 12px;border-radius:20px;font-weight:500;">' + (post.Players || '') + '</span>'
       + '</div>'
       + '<div style="padding:16px 18px;">'
@@ -2373,8 +2373,8 @@ window.loadSFGroup = async function(groupNumber) {
 
   var posts = data.map(function(post) {
     return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
-      + '<div style="position:relative;">'
-'<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
++ '<div style="position:relative;">'
+      + '<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
       + '<span style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);color:#fff;font-size:13px;padding:5px 12px;border-radius:20px;font-weight:500;">' + (post.Players || '') + '</span>'
       + '</div>'
       + '<div style="padding:16px 18px;">'

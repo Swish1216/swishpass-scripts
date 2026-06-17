@@ -611,7 +611,7 @@ window.loadMoreSocialFeed = async function() {
       : '';
     return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
       + '<div style="position:relative;">'
-      + '<img src="' + (post.Attachments || '') + '" style="width:100%;max-height:500px;object-fit:cover;display:block;" />'
+'<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
       + '<span style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);color:#fff;font-size:13px;padding:5px 12px;border-radius:20px;font-weight:500;">' + (post.Players || '') + '</span>'
       + '</div>'
       + '<div style="padding:16px 18px;">'
@@ -807,7 +807,7 @@ if (!data || data.length === 0) {
       : '';
     return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
       + '<div style="position:relative;">'
-      + '<img src="' + (post.Attachments || '') + '" style="width:100%;max-height:500px;object-fit:cover;display:block;" />'
+'<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
       + '<span style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);color:#fff;font-size:13px;padding:5px 12px;border-radius:20px;font-weight:500;">' + (post.Players || '') + '</span>'
       + '</div>'
       + '<div style="padding:16px 18px;">'
@@ -1818,7 +1818,7 @@ var postsContainer = document.getElementById('sf-player-posts');
       : '';
     return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
       + '<div style="position:relative;">'
-      + '<img src="' + (post.Attachments || '') + '" style="width:100%;max-height:500px;object-fit:cover;display:block;" />'
+'<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
       + '<span style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);color:#fff;font-size:13px;padding:5px 12px;border-radius:20px;font-weight:500;">' + (post.Players || '') + '</span>'
       + '</div>'
       + '<div style="padding:16px 18px;">'
@@ -2374,7 +2374,7 @@ window.loadSFGroup = async function(groupNumber) {
   var posts = data.map(function(post) {
     return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
       + '<div style="position:relative;">'
-      + '<img src="' + (post.Attachments || '') + '" style="width:100%;max-height:500px;object-fit:cover;display:block;" />'
+'<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
       + '<span style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);color:#fff;font-size:13px;padding:5px 12px;border-radius:20px;font-weight:500;">' + (post.Players || '') + '</span>'
       + '</div>'
       + '<div style="padding:16px 18px;">'

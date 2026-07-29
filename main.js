@@ -2418,7 +2418,9 @@ window.initSignup = function() {
     + '<div style="padding:0 16px;max-width:440px;margin:0 auto;">'
     + '<h2 style="font-size:24px;font-weight:500;margin-bottom:8px;color:#111;">Create Your Account</h2>'
     + '<p style="font-size:14px;color:#888;margin-bottom:1.5rem;">Join the community of verified hoopers.</p>'
-    + '<div id="signup-form">'
++ '<div id="signup-form">'
+    + '<label style="display:block;font-size:13px;color:#555;margin-bottom:6px;">Date of Birth</label>'
+    + '<input id="signup-birthdate" type="date" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:14px;color:#111;box-sizing:border-box;" />'
     + '<label style="display:block;font-size:13px;color:#555;margin-bottom:6px;">Email</label>'
     + '<input id="signup-email" type="email" placeholder="you@example.com" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:14px;color:#111;box-sizing:border-box;" />'
     + '<label style="display:block;font-size:13px;color:#555;margin-bottom:6px;">Password</label>'
@@ -2434,7 +2436,17 @@ window.initSignup = function() {
     + '</div>';
 };
 
+function calculateAge(birthdateStr) {
+  var today = new Date();
+  var dob = new Date(birthdateStr);
+  var age = today.getFullYear() - dob.getFullYear();
+  var m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+  return age;
+}
+
 window.submitSignup = async function() {
+  var birthdate = document.getElementById('signup-birthdate').value;
 var email = document.getElementById('signup-email').value.trim();
   var password = document.getElementById('signup-password').value;
   var termsAgreed = document.getElementById('signup-terms').checked;
@@ -2442,6 +2454,16 @@ var email = document.getElementById('signup-email').value.trim();
   var btn = document.getElementById('signup-submit');
 
   messageEl.innerHTML = '';
+
+  if (!birthdate) {
+    messageEl.innerHTML = '<span style="color:#e24b4a;">Date of birth is required.</span>';
+    return;
+  }
+
+  if (calculateAge(birthdate) < 18) {
+    messageEl.innerHTML = '<span style="color:#e24b4a;">SwishPass is currently available to users 18 and older. We\'re not able to create your account.</span>';
+    return;
+  }
 
   if (!email || !password) {
     messageEl.innerHTML = '<span style="color:#e24b4a;">Email and password are required.</span>';
@@ -2465,7 +2487,11 @@ var signUpResult = await window._supabase.auth.signUp({
     email: email,
     password: password,
     options: {
-      emailRedirectTo: 'https://swishpass.com/sign-in'
+      emailRedirectTo: 'https://swishpass.com/sign-in',
+      data: {
+        verified_18_plus: true,
+        age_verified_at: new Date().toISOString()
+      }
     }
   });
 
@@ -2625,14 +2651,21 @@ var validationError = window.validateUsername(value);
     }, 400);
   });
 
-  submitBtn.addEventListener("click", async function () {
+submitBtn.addEventListener("click", async function () {
     if (!isAvailable) return;
     submitBtn.disabled = true;
     submitBtn.textContent = "Saving...";
 
+    const meta = user.user_metadata || {};
+    const updatePayload = { "Username": input.value.trim() };
+    if (meta.verified_18_plus) {
+      updatePayload["verified_18_plus"] = true;
+      updatePayload["verified_at"] = meta.age_verified_at || new Date().toISOString();
+    }
+
     const { error } = await window._supabase
       .from("Players")
-      .update({ "Username": input.value.trim() })
+      .update(updatePayload)
       .eq(AUTH_LINK_COLUMN, user.id);
 
     if (error) {

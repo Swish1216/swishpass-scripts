@@ -2429,12 +2429,31 @@ window.initSignup = function() {
     + '<input id="signup-terms" type="checkbox" style="width:16px;height:16px;" />'
     + '<span>I agree to the <a href="/terms-and-conditions" target="_blank" style="color:#378add;">Terms and Conditions</a></span>'
     + '</label>'
+    + '<div id="signup-turnstile" style="margin-bottom:14px;"></div>'
     + '<button id="signup-submit" onclick="submitSignup()" style="width:100%;padding:12px 20px;background:#378add;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;">Create Account</button>'
     + '<div id="signup-message" style="font-size:13px;margin-top:12px;min-height:20px;"></div>'
     + '<p style="font-size:13px;color:#555;text-align:center;margin-top:16px;">Already have an account? <a href="/sign-in" style="color:#378add;">Log in</a></p>'
     + '</div>'
     + '</div>';
 };
+
+var signupTurnstileWidgetId = null;
+function cs_loadTurnstile(callback) {
+  if (window.turnstile) { callback(); return; }
+  var script = document.createElement('script');
+  script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+  script.async = true;
+  script.onload = callback;
+  document.head.appendChild(script);
+}
+(function renderSignupTurnstile() {
+  if (!document.getElementById('signup-turnstile')) return;
+  cs_loadTurnstile(function() {
+    signupTurnstileWidgetId = window.turnstile.render('#signup-turnstile', {
+      sitekey: '0x4AAAAAAECAsrYN5C-tNPtL'
+    });
+  });
+})();
 
 function calculateAge(birthdateStr) {
   var today = new Date();
@@ -2480,7 +2499,30 @@ var email = document.getElementById('signup-email').value.trim();
     return;
   }
 
+var turnstileToken = window.turnstile ? window.turnstile.getResponse(signupTurnstileWidgetId) : null;
+  if (!turnstileToken) {
+    messageEl.innerHTML = '<span style="color:#e24b4a;">Please complete the verification challenge.</span>';
+    return;
+  }
+
   btn.disabled = true;
+  btn.innerText = 'Verifying...';
+
+  var verifyResponse = await fetch('https://wscsrjaylotmcabdwvde.supabase.co/functions/v1/verify-turnstile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: turnstileToken })
+  });
+  var verifyResult = await verifyResponse.json();
+
+  if (!verifyResult.success) {
+    messageEl.innerHTML = '<span style="color:#e24b4a;">Verification failed — please try again.</span>';
+    btn.disabled = false;
+    btn.innerText = 'Create Account';
+    if (window.turnstile) window.turnstile.reset(signupTurnstileWidgetId);
+    return;
+  }
+
   btn.innerText = 'Creating account...';
 
 var signUpResult = await window._supabase.auth.signUp({

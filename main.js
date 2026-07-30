@@ -2433,8 +2433,9 @@ window.initSignup = function() {
     + '<button id="signup-submit" onclick="submitSignup()" style="width:100%;padding:12px 20px;background:#378add;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;">Create Account</button>'
     + '<div id="signup-message" style="font-size:13px;margin-top:12px;min-height:20px;"></div>'
     + '<p style="font-size:13px;color:#555;text-align:center;margin-top:16px;">Already have an account? <a href="/sign-in" style="color:#378add;">Log in</a></p>'
-    + '</div>'
++ '</div>'
     + '</div>';
+  renderSignupTurnstile();
 };
 
 var signupTurnstileWidgetId = null;
@@ -2446,14 +2447,14 @@ function cs_loadTurnstile(callback) {
   script.onload = callback;
   document.head.appendChild(script);
 }
-(function renderSignupTurnstile() {
+function renderSignupTurnstile() {
   if (!document.getElementById('signup-turnstile')) return;
   cs_loadTurnstile(function() {
     signupTurnstileWidgetId = window.turnstile.render('#signup-turnstile', {
       sitekey: '0x4AAAAAAECAsrYN5C-tNPtL'
     });
   });
-})();
+}
 
 function calculateAge(birthdateStr) {
   var today = new Date();

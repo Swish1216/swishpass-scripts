@@ -341,6 +341,21 @@ window.loadBadges = async function() {
   var container = document.getElementById('badges-container');
   if (!container) return;
 
+  // ── Resolve current active season name dynamically (not the stored,
+  //    per-badge "Season" column, which goes stale every season) ─────────
+  var activeSeasonName = cacheGet('active_season_name');
+  if (!activeSeasonName) {
+    var seasonResult = await window._supabase
+      .from('seasons')
+      .select('season_name')
+      .eq('is_active', true)
+      .limit(1)
+      .single();
+    activeSeasonName = (seasonResult.data && seasonResult.data.season_name) || 'N/A';
+    cacheSet('active_season_name', activeSeasonName, 600);
+  }
+  window._activeSeasonName = activeSeasonName;
+
   // ── Fetch badge catalog (cached 600s — 10 min) ──────────────────────────
   var data = cacheGet('badges_catalog');
   if (!data) {
@@ -362,7 +377,7 @@ window.loadBadges = async function() {
       + '<p style="font-size:13px;color:#555;margin:0 0 6px;">' + (b.Notes || '') + '</p>'
       + '<p style="font-size:12px;color:#888;margin:0 0 2px;">Start: ' + (b['Start Date'] || 'N/A') + '</p>'
       + '<p style="font-size:12px;color:#888;margin:0 0 2px;">End: ' + (b['End Date'] || 'N/A') + '</p>'
-      + '<p style="font-size:12px;color:#888;margin:0;">Season: ' + (b.Season || 'N/A') + '</p>'
++ '<p style="font-size:12px;color:#888;margin:0;">Season: ' + activeSeasonName + '</p>'
       + '</div>'
       + '<button onclick="showBadgeModal(this)" data-badge=\'' + JSON.stringify(b).replace(/'/g, '&#39;') + '\' style="font-size:12px;color:#555;cursor:pointer;white-space:nowrap;align-self:center;padding:6px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;">View →</button>'
       + '</div>';
@@ -390,7 +405,7 @@ window.showBadgeModal = function(btnOrData) {
 + '<img src="' + (b['Badge Image URL'] || '') + '" style="width:360px;height:360px;object-fit:contain;border-radius:12px;background:#f5f5f5;margin-bottom:16px;" />'
     + '<h3 style="font-size:18px;font-weight:600;color:#111;margin:0 0 8px;">' + escHtml(b.Name || '') + '</h3>'
     + '<p style="font-size:14px;color:#555;margin:0 0 16px;line-height:1.5;">' + escHtml(b.Notes || '') + '</p>'
-    + '<p style="font-size:12px;color:#888;margin:0;">Season: ' + escHtml(b.Season || 'N/A') + ' · ' + escHtml(b['Start Date'] || '') + ' – ' + escHtml(b['End Date'] || '') + '</p>'
++ '<p style="font-size:12px;color:#888;margin:0;">Season: ' + escHtml(window._activeSeasonName || 'N/A') + ' · ' + escHtml(b['Start Date'] || '') + ' – ' + escHtml(b['End Date'] || '') + '</p>'
     + '</div>';
   overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);

@@ -619,7 +619,8 @@ window.loadMoreSocialFeed = async function() {
   }
 
   var postsContainer = document.getElementById('social-feed-posts');
-  var newPosts = data.map(function(post) {
+  var newPosts = data.map(function(rawPost) {
+    var post = escPost(rawPost);
     var isOwner = currentPlayerProfileNumber && post.player_id == currentPlayerProfileNumber;
     var deleteBtn = isOwner
       ? '<button onclick="deletePost(\'' + post['Feed Posts'] + '\')" style="padding:8px 16px;background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">Delete Post</button>'
@@ -815,7 +816,8 @@ if (!data || data.length === 0) {
     return;
   }
 
-  var newPosts = data.map(function(post) {
+  var newPosts = data.map(function(rawPost) {
+    var post = escPost(rawPost);
     var isOwner = currentPlayerProfileNumber && post.player_id == currentPlayerProfileNumber;
     var deleteBtn = isOwner
       ? '<button onclick="deleteFriendPost(\'' + post['Feed Posts'] + '\')" style="padding:8px 16px;background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">Delete Post</button>'
@@ -1474,12 +1476,27 @@ function vsFormatSessionTime(start, end) {
 }
 
 // ── XSS guard ─────────────────────────────────────────────────────────────────
+// ── XSS guard ─────────────────────────────────────────────────────────────────
 function escHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+// ── Escape the user-typed fields on a post before rendering ───────────────────
+// Returns a shallow copy. Leaves "Feed Posts", player_id, Date, and Attachments
+// untouched so IDs and URLs keep working exactly as before.
+function escPost(post) {
+  var safe = {};
+  for (var k in post) {
+    if (Object.prototype.hasOwnProperty.call(post, k)) safe[k] = post[k];
+  }
+  if (post.Post)           safe.Post           = escHtml(post.Post);
+  if (post.Players)        safe.Players        = escHtml(post.Players);
+  if (post['Court Name'])  safe['Court Name']  = escHtml(post['Court Name']);
+  return safe;
 }
 
 // ========================================
@@ -1722,14 +1739,13 @@ window.renderLiveCourtFeed = function() {
       : '<span style="padding:2px 8px;background:#f5f5f5;color:#888;border-radius:4px;font-size:11px;">Unverified</span>';
 
     return '<tr style="border-bottom:1px solid #f5f5f5;">'
-      + '<td style="padding:12px 8px;color:#111;font-weight:500;">' + (c.courtName  || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;">'                            + activeBadge              + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">'                 + (c.address    || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">'                 + (c.city       || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">'                 + (c.state      || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">'                 + (c.country    || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;color:#555;">'                 + (c.courtType  || 'N/A') + '</td>'
-      + '<td style="padding:12px 8px;">'                            + verifiedBadge            + '</td>'
+      + '<td style="padding:12px 8px;color:#111;font-weight:500;">' + escHtml(c.courtName  || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;">'                            + activeBadge                    + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + escHtml(c.address    || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + escHtml(c.city       || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + escHtml(c.state      || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + escHtml(c.country    || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;color:#555;">'                 + escHtml(c.courtType  || 'N/A') + '</td>'
       + '</tr>';
   }).join('');
 };
@@ -1823,7 +1839,8 @@ window.loadMoreSFPlayer = async function() {
   }
 
 var postsContainer = document.getElementById('sf-player-posts');
-  var newPosts = data.map(function(post) {
+  var newPosts = data.map(function(rawPost) {
+    var post = escPost(rawPost);
     var isOwner = currentPlayerProfileNumber && post.player_id == currentPlayerProfileNumber;
     var reportBtn = !isOwner && currentPlayerProfileNumber
       ? '<button onclick="reportPost(\'' + post['Feed Posts'] + '\')" style="padding:8px 16px;background:#378add;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">Report Post</button>'
@@ -2386,7 +2403,8 @@ window.loadSFGroup = async function(groupNumber) {
   var totalPosts = countResult.count || data.length;
   var hasMore = totalPosts > SF_GROUP_LIMIT;
 
-  var posts = data.map(function(post) {
+  var posts = data.map(function(rawPost) {
+    var post = escPost(rawPost);
     return '<div style="border-radius:12px;overflow:hidden;border:1px solid #eee;background:#fff;">'
 + '<div style="position:relative;">'
       + '<img src="' + (post.Attachments || '') + '" onclick="vsShowPhotoModal(\'' + (post.Attachments || '') + '\')" style="width:100%;max-height:500px;object-fit:cover;display:block;cursor:pointer;" title="Tap to enlarge" />'
@@ -3847,7 +3865,7 @@ async function loadGroupProfile() {
       <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f5f5f5;">
         ${photo}
         <div style="flex:1;min-width:0;">
-          <p style="font-size:14px;font-weight:500;color:#111;margin:0 0 2px;">${p.Username || 'Unknown'}${isMe ? ' <span style="font-size:11px;color:#378add;">(You)</span>' : ''}</p>
+          <p style="font-size:14px;font-weight:500;color:#111;margin:0 0 2px;">${escHtml(p.Username || 'Unknown')}${isMe ? ' <span style="font-size:11px;color:#378add;">(You)</span>' : ''}</p>
           <p style="font-size:12px;color:#888;margin:0;">Rank #${p.Ranking || 'N/A'}</p>
         </div>
         ${roleBadge}
@@ -3897,7 +3915,7 @@ async function loadGroupProfile() {
           ${(group.group_name || '?').charAt(0).toUpperCase()}
         </div>
         <div style="flex:1;min-width:0;">
-          <h1 style="font-size:22px;font-weight:700;color:#111;margin:0 0 4px;">${group.group_name || 'Unnamed Group'}</h1>
+          <h1 style="font-size:22px;font-weight:700;color:#111;margin:0 0 4px;">${escHtml(group.group_name || 'Unnamed Group')}</h1>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <span style="font-size:12px;color:#888;">${members.length} member${members.length === 1 ? '' : 's'}</span>
             <span style="color:#ddd;">·</span>
@@ -3907,7 +3925,7 @@ async function loadGroupProfile() {
       </div>
 
       <!-- Description -->
-      ${group.description ? `<p style="font-size:14px;color:#555;margin:0 0 24px;line-height:1.6;padding:14px 16px;background:#fafafa;border-radius:8px;border:1px solid #eee;">${group.description}</p>` : ''}
+      ${group.description ? `<p style="font-size:14px;color:#555;margin:0 0 24px;line-height:1.6;padding:14px 16px;background:#fafafa;border-radius:8px;border:1px solid #eee;">${escHtml(group.description)}</p>` : ''}
 
       <!-- Owner/Admin: Join requests panel -->
       ${canManageRequests && group.is_private ? `
@@ -4116,8 +4134,8 @@ async function renderJoinRequestsList(groupId, container) {
       <div id="req-row-${req.id}" style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f5f5f5;">
         ${photo}
         <div style="flex:1;min-width:0;">
-          <p style="font-size:14px;font-weight:500;color:#111;margin:0 0 2px;">${p.Username || 'Unknown'}</p>
-          <p style="font-size:12px;color:#888;margin:0;">${p.Tier || ''}</p>
+          <p style="font-size:14px;font-weight:500;color:#111;margin:0 0 2px;">${escHtml(p.Username || 'Unknown')}</p>
+          <p style="font-size:12px;color:#888;margin:0;">${escHtml(p.Tier || '')}</p>
         </div>
         <button onclick="handleAcceptRequest('${req.id}', ${req.player_id}, '${groupId}')"
           style="padding:6px 14px;background:#2d7a3a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;">

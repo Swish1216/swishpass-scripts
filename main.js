@@ -4918,7 +4918,7 @@ function updateSidebarUI(player) {
   }
 }
 // ─────────────────────────────────────────────────────────────────────────────
-// PROOF OF PLAY — Add a Court
+// SwishPass — Add a Court
 // Paste at the bottom of main.js
 // Div Block on Webflow page must have ID: court-submit-root
 // Uses window._supabase already initialized in Webflow head code
@@ -5258,7 +5258,7 @@ var form = document.getElementById('cs-form');
   // ── Build HTML ──────────────────────────────────────────────────────────────
   function cs_buildHTML(root) {
     root.innerHTML = [
-      '<p class="cs-eyebrow">🏀 Proof of Play</p>',
+      '<p class="cs-eyebrow">🏀 SwishPass</p>',
       '<h1 class="cs-title">Add a<br><span>Court</span></h1>',
       '<p class="cs-subtitle">Know a court worth playing on? Add it to the database — no photo required. Courts go live immediately and earn you a badge once verified by our team.</p>',
 

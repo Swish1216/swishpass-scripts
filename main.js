@@ -1476,7 +1476,6 @@ function vsFormatSessionTime(start, end) {
 }
 
 // ── XSS guard ─────────────────────────────────────────────────────────────────
-// ── XSS guard ─────────────────────────────────────────────────────────────────
 function escHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -1746,6 +1745,7 @@ window.renderLiveCourtFeed = function() {
       + '<td style="padding:12px 8px;color:#555;">'                 + escHtml(c.state      || 'N/A') + '</td>'
       + '<td style="padding:12px 8px;color:#555;">'                 + escHtml(c.country    || 'N/A') + '</td>'
       + '<td style="padding:12px 8px;color:#555;">'                 + escHtml(c.courtType  || 'N/A') + '</td>'
+      + '<td style="padding:12px 8px;">'                            + verifiedBadge                  + '</td>'
       + '</tr>';
   }).join('');
 };

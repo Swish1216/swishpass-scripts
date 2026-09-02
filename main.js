@@ -4387,7 +4387,14 @@ async function deleteGroup(group) {
   const confirmed = confirm(`Permanently delete "${group.group_name}"? This cannot be undone.`);
   if (!confirmed) return;
 
-  // Delete all members first (FK safety)
+  // Delete pending join requests first, while the caller's owner/admin
+  // membership row still exists to satisfy the RLS policy
+  await window._supabase
+    .from('Group_Join_Requests')
+    .delete()
+    .eq('group_id', group.id);
+
+  // Delete all members
   await window._supabase
     .from('Group Members')
     .delete()

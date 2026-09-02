@@ -3768,7 +3768,9 @@ async function initCreateGroup() {
       .single();
 
     if (groupError || !groupData) {
-      errorEl.textContent = 'Failed to create group. Please try again.';
+      errorEl.textContent = groupError && groupError.code === '23505'
+        ? 'That group name is already taken — try adding your city or crew name, like "' + groupName + ' Chi".'
+        : 'Failed to create group. Please try again.';
       submitBtn.disabled = false;
       submitBtn.textContent = 'Create Group';
       return;

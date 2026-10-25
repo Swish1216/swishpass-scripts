@@ -5547,7 +5547,7 @@ async function initDeleteAccount() {
 
   container.innerHTML = `
     <div class="pop-form">
-      <h2 class="pop-title" style="color:#e24b4a;">Delete Account</h2>
+      <h2 class="pop-title" style="color:#e24b4a;">Delete Your SwishPass Account</h2>
       <p class="pop-sub">
         This will permanently delete your account, profile, all posts, session history, XP, badges, and rankings.
         <strong style="color:#111;display:block;margin-top:8px;">This cannot be undone.</strong>
